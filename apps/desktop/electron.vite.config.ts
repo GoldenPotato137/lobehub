@@ -94,6 +94,9 @@ const BUSINESS_CONST_MODULE_ID = '@lobechat/business-const';
 const CLOUD_BUSINESS_CONST_MODULE_ID = '@cloud/business-const';
 const DYNAMIC_BUSINESS_CONST_QUERY = '?lobe-cloud-desktop-business-const';
 
+const createBusinessFeaturesBootstrapScript = () =>
+  `globalThis[${JSON.stringify(CLOUD_DESKTOP_BUSINESS_FEATURES_FLAG)}] = true;`;
+
 const replaceBusinessFlagExport = (code: string, name: string, initializer: string) => {
   const pattern = new RegExp(`export\\s+(?:const|let|var)\\s+${name}\\s*=\\s*[\\s\\S]*?;`);
 
@@ -174,6 +177,15 @@ function cloudDesktopBusinessConstPlugin(): PluginOption {
       return injectDynamicBusinessFeatureFlag(readFileSync(sourcePath, 'utf8'));
     },
     name: 'lobe-cloud-desktop-business-const',
+    transformIndexHtml() {
+      return [
+        {
+          children: createBusinessFeaturesBootstrapScript(),
+          injectTo: 'head-prepend',
+          tag: 'script',
+        },
+      ];
+    },
   };
 }
 
@@ -196,6 +208,8 @@ const mainProcessRuntimeExternals = [
   ...externalRuntimeModules,
   'node-mac-permissions',
 ];
+const externalNavigationHosts =
+  process.env.DESKTOP_EXTERNAL_NAVIGATION_HOSTS ?? (isCloudDesktopBuild ? 'stripe.com' : '');
 
 console.info(`[electron-vite.config.ts] Detected UPDATE_CHANNEL: ${updateChannel}`);
 console.info(`[electron-vite.config.ts] Cloud desktop build: ${isCloudDesktopBuild}`);
@@ -267,6 +281,7 @@ export default defineConfig({
       sourcemap: isDev ? 'inline' : false,
     },
     define: {
+      'process.env.DESKTOP_EXTERNAL_NAVIGATION_HOSTS': JSON.stringify(externalNavigationHosts),
       'process.env.UPDATE_CHANNEL': JSON.stringify(process.env.UPDATE_CHANNEL),
       'process.env.UPDATE_SERVER_URL': JSON.stringify(process.env.UPDATE_SERVER_URL),
     },
