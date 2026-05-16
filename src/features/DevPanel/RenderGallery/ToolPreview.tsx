@@ -283,6 +283,7 @@ const ToolPreview = ({ api, mode }: ToolPreviewProps) => {
                   partialArgs={derived.partialArgs}
                   pluginState={derived.pluginState}
                   result={inspectorResult}
+                  toolCallId={toolCallId}
                 />
               </RenderBoundary>
             ) : (

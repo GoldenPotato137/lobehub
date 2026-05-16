@@ -1,4 +1,4 @@
-import type { CreateThreadParams } from '@lobechat/types';
+import type { CreateThreadParams, ThreadMetadata } from '@lobechat/types';
 import { ThreadStatus } from '@lobechat/types';
 import { and, desc, eq } from 'drizzle-orm';
 
@@ -79,6 +79,27 @@ export class ThreadModel {
     return this.db
       .update(threads)
       .set({ ...value, updatedAt: new Date() })
+      .where(and(eq(threads.id, id), eq(threads.userId, this.userId)));
+  };
+
+  /**
+   * Shallow-merge a metadata patch into the existing JSONB column. Mirrors
+   * `TopicModel.updateMetadata` so callers don't need to fetch-then-update
+   * to avoid clobbering peer fields (e.g. `sourceToolCallId`, `startedAt`,
+   * `subagentType` set at create time vs. `totalToolCalls` / `duration`
+   * written on finalize).
+   */
+  updateMetadata = async (id: string, metadata: Partial<ThreadMetadata>) => {
+    const existing = await this.db.query.threads.findFirst({
+      columns: { metadata: true },
+      where: and(eq(threads.id, id), eq(threads.userId, this.userId)),
+    });
+
+    const merged = { ...existing?.metadata, ...metadata } as ThreadMetadata;
+
+    return this.db
+      .update(threads)
+      .set({ metadata: merged, updatedAt: new Date() })
       .where(and(eq(threads.id, id), eq(threads.userId, this.userId)));
   };
 }

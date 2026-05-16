@@ -41,9 +41,11 @@ vi.mock('@/services/message', () => ({
 
 // threadService — subagent Thread creation (CC `Task` tool_use)
 const mockCreateThread = vi.fn();
+const mockUpdateThreadMetadata = vi.fn(async () => undefined);
 vi.mock('@/services/thread', () => ({
   threadService: {
     createThread: (...args: any[]) => mockCreateThread(...args),
+    updateThreadMetadata: (...args: any[]) => mockUpdateThreadMetadata(...args),
   },
 }));
 

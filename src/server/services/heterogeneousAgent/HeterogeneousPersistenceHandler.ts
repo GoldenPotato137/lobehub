@@ -1231,8 +1231,27 @@ export class HeterogeneousPersistenceHandler {
       run.lastChainParentId = terminal.id;
     }
 
-    // Mark the thread completed. Idempotent — re-running on a retry just
-    // re-writes the same status; downstream UI badges are derived state.
+    // Roll up subagent stats onto `thread.metadata` so historical viewers can
+    // surface counts without re-walking the message list. Tool count comes
+    // from `lifetimeToolCallIds` (dedup'd across turns); `duration` is derived
+    // off the existing `startedAt` set in `ensureSubagentRun`. Token / cost
+    // totals are NOT written here — CC's `step_complete{phase:turn_metadata}`
+    // is currently emitted without the `subagent` context tag, so per-turn
+    // usage gets attributed to the main assistant. The Inspector falls back
+    // to live-summing subagent message usage when these fields are absent.
+    //
+    // `updateMetadata` shallow-merges so `sourceToolCallId` / `subagentType` /
+    // `startedAt` (set at create time) stay intact alongside the new totals.
+    const completedAt = new Date().toISOString();
+    const startedAtIso = (await this.deps.threadModel.findById(run.threadId))?.metadata?.startedAt;
+    const duration = startedAtIso ? Date.now() - new Date(startedAtIso).getTime() : undefined;
+
+    await this.deps.threadModel.updateMetadata(run.threadId, {
+      completedAt,
+      duration,
+      totalToolCalls: run.lifetimeToolCallIds.size,
+    });
+
     await this.deps.threadModel.update(run.threadId, { status: ThreadStatus.Active });
 
     state.subagentRuns.delete(parentToolCallId);

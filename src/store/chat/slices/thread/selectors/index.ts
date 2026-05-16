@@ -138,6 +138,7 @@ export const threadSelectors = {
   currentActiveThread,
   currentPortalThread,
   currentTopicThreads,
+  getThreadChildMessages,
   getThreadsBySourceMsgId,
   getThreadsByTopic,
   hasThreadBySourceMsgId,

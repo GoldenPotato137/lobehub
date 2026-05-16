@@ -7,7 +7,7 @@ import { insertThreadSchema } from '@/database/schemas';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { type ThreadItem } from '@/types/topic/thread';
-import { createThreadSchema } from '@/types/topic/thread';
+import { createThreadSchema, threadMetadataSchema } from '@/types/topic/thread';
 
 /**
  * `ThreadModel.create` uses `onConflictDoNothing()` and returns undefined when
@@ -113,6 +113,17 @@ export const threadRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       return ctx.threadModel.update(input.id, input.value);
+    }),
+
+  updateThreadMetadata: threadProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        metadata: threadMetadataSchema.partial(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      return ctx.threadModel.updateMetadata(input.id, input.metadata);
     }),
 });
 

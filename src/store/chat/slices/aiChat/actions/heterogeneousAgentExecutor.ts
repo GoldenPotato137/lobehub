@@ -974,6 +974,19 @@ const finalizeSubagentRun = async ({
     }
   }
 
+  // Roll up totals onto `thread.metadata` so the inspector can show the
+  // final tool count / duration without re-walking subagent messages. Fire
+  // and forget — the chip already shows live values via store derivation,
+  // so a transient persist failure only degrades the cached-load path.
+  threadService
+    .updateThreadMetadata(run.threadId, {
+      completedAt: new Date().toISOString(),
+      totalToolCalls: run.lifetimeToolCallIds.size,
+    })
+    .catch((err) => {
+      console.error('[HeterogeneousAgent] Failed to persist subagent thread totals:', err);
+    });
+
   completeSubOp(run.subOperationId);
 };
 
