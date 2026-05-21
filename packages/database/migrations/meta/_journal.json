@@ -721,6 +721,13 @@
       "when": 1778602304603,
       "tag": "0102_add_agent_operations_table",
       "breakpoints": true
+    },
+    {
+      "idx": 103,
+      "version": "7",
+      "when": 1779296667338,
+      "tag": "0103_add_document_shares_table",
+      "breakpoints": true
     }
   ],
   "version": "6"
