@@ -33,7 +33,7 @@
     "@lobechat/heterogeneous-agents": "workspace:*",
     "@lobechat/local-file-shell": "workspace:*",
     "@trpc/client": "^11.8.1",
-    "@types/node": "^22.13.5",
+    "@types/node": "^24.12.4",
     "@types/ws": "^8.18.1",
     "commander": "^13.1.0",
     "dayjs": "^1.11.19",
