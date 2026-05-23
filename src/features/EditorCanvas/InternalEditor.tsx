@@ -86,6 +86,7 @@ export interface InternalEditorProps extends EditorCanvasProps {
 const InternalEditor = memo<InternalEditorProps>(
   ({
     contentChangeLockRef,
+    editable = true,
     editor,
     extraPlugins,
     floatingToolbar = true,
@@ -277,6 +278,7 @@ const InternalEditor = memo<InternalEditorProps>(
       >
         <Editor
           content={''}
+          editable={editable}
           editor={editor}
           placeholder={finalPlaceholder}
           plugins={plugins}

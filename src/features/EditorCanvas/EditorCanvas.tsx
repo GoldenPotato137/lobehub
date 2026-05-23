@@ -49,6 +49,13 @@ export interface EditorCanvasProps {
   documentId?: string;
 
   /**
+   * Whether the editor accepts input. Defaults to true. Set false to render
+   * the content read-only (still preserves Lexical-node attributes like image
+   * width/height, which a plain markdown renderer would drop).
+   */
+  editable?: boolean;
+
+  /**
    * Editor data to render directly (skip fetch).
    * Use this when you already have the content and don't need to fetch.
    */

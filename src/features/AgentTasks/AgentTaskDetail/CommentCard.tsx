@@ -43,6 +43,7 @@ const CommentCard = memo<CommentCardProps>(({ activity }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const editor = useEditor();
+  const displayEditor = useEditor();
 
   const { text: relTime, title: relTimeTitle } = useActivityTime(activity.time);
   const content = activity.content || t('taskDetail.activities.fallback.comment');
@@ -170,6 +171,15 @@ const CommentCard = memo<CommentCardProps>(({ activity }) => {
             </Flexbox>
           </Flexbox>
         </>
+      ) : activity.editorData ? (
+        <EditorCanvas
+          editable={false}
+          editor={displayEditor}
+          editorData={editorData}
+          entityId={commentId}
+          floatingToolbar={false}
+          style={{ paddingBottom: 0 }}
+        />
       ) : (
         <Markdown fontSize={14} variant={'chat'}>
           {content}
