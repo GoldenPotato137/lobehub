@@ -20,6 +20,10 @@ const activeTaskPriority = (s: TaskStoreState) => activeTaskDetail(s)?.priority 
 
 const activeTaskInstruction = (s: TaskStoreState) => activeTaskDetail(s)?.instruction;
 
+const activeTaskEditorData = (s: TaskStoreState) => activeTaskDetail(s)?.editorData;
+
+const activeTaskFiles = (s: TaskStoreState) => activeTaskDetail(s)?.files;
+
 const activeTaskDescription = (s: TaskStoreState) => activeTaskDetail(s)?.description;
 
 const activeTaskAgentId = (s: TaskStoreState) => activeTaskDetail(s)?.agentId;
@@ -93,7 +97,9 @@ export const taskDetailSelectors = {
   activeTaskDependencies,
   activeTaskDescription,
   activeTaskDetail,
+  activeTaskEditorData,
   activeTaskError,
+  activeTaskFiles,
   activeTaskId,
   activeTaskInstruction,
   activeTaskName,

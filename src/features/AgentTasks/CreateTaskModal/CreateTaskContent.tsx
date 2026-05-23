@@ -5,11 +5,15 @@ import { ActionIcon, Block, Flexbox, Icon, Text } from '@lobehub/ui';
 import { useModalContext } from '@lobehub/ui/base-ui';
 import { Button } from 'antd';
 import { cssVar } from 'antd-style';
-import { Minimize2, UserCircle2, X } from 'lucide-react';
+import { Minimize2, Paperclip, UserCircle2, X } from 'lucide-react';
 import { type KeyboardEvent, memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { EditorCanvas } from '@/features/EditorCanvas';
+import {
+  getAttachmentFileIdsFromEditor,
+  pickAndInsertAttachments,
+} from '@/features/EditorCanvas/editorAttachments';
 import { useGlobalStore } from '@/store/global';
 import { useTaskStore } from '@/store/task';
 
@@ -56,12 +60,22 @@ const CreateTaskContent = memo<CreateTaskContentProps>(
       instructionRef.current = String(editor.getDocument('markdown') ?? '');
     }, [editor]);
 
+    const handleAttach = useCallback(() => {
+      pickAndInsertAttachments(editor);
+    }, [editor]);
+
     const handleSubmit = useCallback(async () => {
       const instruction = instructionRef.current.trim();
-      if (!instruction && !title.trim()) return;
+      const fileIds = getAttachmentFileIdsFromEditor(editor);
+      const hasFiles = fileIds.length > 0;
+      if (!instruction && !title.trim() && !hasFiles) return;
+
+      const editorJson = editor?.getDocument?.('json') as unknown;
 
       const result = await createTask({
         assigneeAgentId,
+        editorData: editorJson,
+        fileIds: hasFiles ? fileIds : undefined,
         instruction: instruction || title.trim(),
         name: title.trim() || undefined,
         priority: priority || undefined,
@@ -74,7 +88,7 @@ const CreateTaskContent = memo<CreateTaskContentProps>(
           identifier: result.identifier,
         });
       }
-    }, [assigneeAgentId, close, createTask, onCreated, priority, title]);
+    }, [assigneeAgentId, close, createTask, editor, onCreated, priority, title]);
 
     const handleSubmitRef = useRef(handleSubmit);
     useEffect(() => {
@@ -184,6 +198,12 @@ const CreateTaskContent = memo<CreateTaskContentProps>(
                 )}
               </Block>
             </AssigneeAgentSelector>
+
+            <ActionIcon
+              icon={Paperclip}
+              title={t('upload.action.tooltip')}
+              onClick={handleAttach}
+            />
           </Flexbox>
 
           <Button

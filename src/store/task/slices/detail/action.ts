@@ -23,6 +23,8 @@ type DeletedTask = NonNullable<Awaited<ReturnType<typeof taskService.delete>>['d
 export interface TaskUpdatePayload {
   assigneeAgentId?: string | null;
   description?: string;
+  editorData?: unknown;
+  fileIds?: string[];
   instruction?: string;
   name?: string;
   parentTaskId?: string | null;
@@ -65,7 +67,7 @@ export class TaskDetailSliceActionImpl {
   addComment = async (
     taskId: string,
     content: string,
-    opts?: { authorAgentId?: string; briefId?: string; topicId?: string },
+    opts?: { authorAgentId?: string; briefId?: string; fileIds?: string[]; topicId?: string },
   ): Promise<Awaited<ReturnType<typeof taskService.addComment>>> => {
     const result = await taskService.addComment(taskId, content, opts);
     await this.internal_refreshTaskDetail(taskId);
@@ -131,6 +133,8 @@ export class TaskDetailSliceActionImpl {
     automationMode?: 'heartbeat' | 'schedule';
     createdByAgentId?: string;
     description?: string;
+    editorData?: unknown;
+    fileIds?: string[];
     instruction: string;
     name?: string;
     parentTaskId?: string;

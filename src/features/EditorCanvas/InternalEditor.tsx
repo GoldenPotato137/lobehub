@@ -3,6 +3,7 @@
 import { isDesktop } from '@lobechat/const';
 import type { IEditor } from '@lobehub/editor';
 import {
+  ReactFilePlugin,
   ReactImagePlugin,
   ReactLinkPlugin,
   ReactLiteXmlPlugin,
@@ -18,7 +19,8 @@ import { createChatInputRichPlugins } from '@/features/ChatInput/InputEditor/plu
 
 import { type EditorCanvasProps } from './EditorCanvas';
 import InlineToolbar from './InlineToolbar';
-import { useImageUpload } from './useImageUpload';
+import { registerAttachmentClickOpen } from './registerAttachmentClickOpen';
+import { useFileUpload, useImageUpload } from './useImageUpload';
 
 const IMAGE_FILTERS = [
   { extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif'], name: 'Images' },
@@ -98,6 +100,7 @@ const InternalEditor = memo<InternalEditorProps>(
     const { t } = useTranslation('file');
     const editorState = useEditorState(editor);
     const handleImageUpload = useImageUpload();
+    const handleFileUpload = useFileUpload();
 
     const handlePickFile = useCallback(async (): Promise<File | null> => {
       if (!isDesktop) return null;
@@ -124,10 +127,14 @@ const InternalEditor = memo<InternalEditorProps>(
         onPickFile: isDesktop ? handlePickFile : undefined,
       });
 
+      const filePlugin = Editor.withProps(ReactFilePlugin, {
+        handleUpload: handleFileUpload,
+      });
+
       // Build base plugins with optional extra plugins prepended
       const basePlugins = extraPlugins
-        ? [...extraPlugins, ...STATIC_PLUGINS, imagePlugin]
-        : [...STATIC_PLUGINS, imagePlugin];
+        ? [...extraPlugins, ...STATIC_PLUGINS, imagePlugin, filePlugin]
+        : [...STATIC_PLUGINS, imagePlugin, filePlugin];
 
       // Add toolbar if enabled
       if (floatingToolbar) {
@@ -153,6 +160,7 @@ const InternalEditor = memo<InternalEditorProps>(
       editorState,
       extraPlugins,
       floatingToolbar,
+      handleFileUpload,
       handleImageUpload,
       handlePickFile,
       toolbarExtraItems,
@@ -165,6 +173,15 @@ const InternalEditor = memo<InternalEditorProps>(
       return () => {
         window.__editor = undefined;
       };
+    }, [editor]);
+
+    // Open file attachments in a new tab on click (PDFs preview natively).
+    // Workaround for @lobehub/editor's ReactFile decorator not exposing a
+    // download / preview affordance — tracked in LOBE-9202.
+    useEffect(() => {
+      if (!editor) return;
+      const unregister = registerAttachmentClickOpen(editor);
+      return () => unregister?.();
     }, [editor]);
 
     const onInitRef = useRef(onInit);

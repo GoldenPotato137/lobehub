@@ -18,6 +18,7 @@ import { MessageCircle, MoreHorizontal, Pencil, Trash } from 'lucide-react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import FileListViewer from '@/features/Conversation/Messages/User/components/FileListViewer';
 import { useActivityTime } from '@/hooks/useActivityTime';
 import { useTaskStore } from '@/store/task';
 
@@ -141,9 +142,12 @@ const CommentCard = memo<CommentCardProps>(({ activity }) => {
           </Flexbox>
         </>
       ) : (
-        <Markdown fontSize={14} variant={'chat'}>
-          {content}
-        </Markdown>
+        <Flexbox gap={8}>
+          <Markdown fontSize={14} variant={'chat'}>
+            {content}
+          </Markdown>
+          {activity.files && activity.files.length > 0 && <FileListViewer items={activity.files} />}
+        </Flexbox>
       )}
 
       {!isEditing && commentId && (

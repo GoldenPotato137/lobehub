@@ -52,6 +52,8 @@ class TaskService {
     automationMode?: TaskAutomationMode;
     createdByAgentId?: string;
     description?: string;
+    editorData?: unknown;
+    fileIds?: string[];
     identifierPrefix?: string;
     instruction: string;
     name?: string;
@@ -71,6 +73,8 @@ class TaskService {
       config?: Record<string, unknown>;
       context?: Record<string, unknown>;
       description?: string;
+      editorData?: unknown;
+      fileIds?: string[];
       // heartbeatInterval: periodic execution interval (seconds), controls how often the task auto-executes
       heartbeatInterval?: number;
       // heartbeatTimeout: watchdog timeout threshold (seconds), used to detect if a running task is stuck
@@ -103,7 +107,7 @@ class TaskService {
   addComment = async (
     id: string,
     content: string,
-    opts?: { authorAgentId?: string; briefId?: string; topicId?: string },
+    opts?: { authorAgentId?: string; briefId?: string; fileIds?: string[]; topicId?: string },
   ) => lambdaClient.task.addComment.mutate({ content, id, ...opts });
 
   deleteComment = async (commentId: string) =>

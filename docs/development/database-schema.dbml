@@ -1652,6 +1652,18 @@ table task_comments {
   }
 }
 
+table task_comments_files {
+  file_id text [not null]
+  comment_id text [not null]
+  user_id text [not null]
+
+  indexes {
+    (file_id, comment_id) [pk]
+    comment_id [name: 'task_comments_files_comment_id_idx']
+    user_id [name: 'task_comments_files_user_id_idx']
+  }
+}
+
 table task_dependencies {
   id uuid [pk, not null, default: `gen_random_uuid()`]
   task_id text [not null]
@@ -1724,6 +1736,7 @@ table tasks {
   name text
   description varchar(255)
   instruction text [not null]
+  editor_data jsonb
   status text [not null, default: 'backlog']
   priority integer [default: 0]
   sort_order integer [default: 0]
@@ -1757,6 +1770,18 @@ table tasks {
     priority [name: 'tasks_priority_idx']
     automation_mode [name: 'tasks_automation_mode_idx']
     (status, last_heartbeat_at) [name: 'tasks_heartbeat_idx']
+  }
+}
+
+table tasks_files {
+  file_id text [not null]
+  task_id text [not null]
+  user_id text [not null]
+
+  indexes {
+    (file_id, task_id) [pk]
+    task_id [name: 'tasks_files_task_id_idx']
+    user_id [name: 'tasks_files_user_id_idx']
   }
 }
 

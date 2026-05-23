@@ -4,6 +4,11 @@ import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { shallow } from 'zustand/shallow';
 
+import {
+  AttachmentPreviewList,
+  AttachmentUploadButton,
+  useAttachmentUpload,
+} from '@/features/AttachmentInput';
 import { useEnterToSend } from '@/hooks/useEnterToSend';
 import { useUserAvatar } from '@/hooks/useUserAvatar';
 import { useTaskStore } from '@/store/task';
@@ -30,13 +35,22 @@ const FeedbackInput = memo<FeedbackInputProps>(({ taskId, topicId }) => {
   const [submitting, setSubmitting] = useState(false);
   const [hasContent, setHasContent] = useState(false);
   const shouldSendOnEnter = useEnterToSend();
+  const attachments = useAttachmentUpload();
+
+  const hasAttachments = attachments.items.length > 0;
+  const canSubmit = hasContent || hasAttachments;
+  const { uploading } = attachments;
 
   const handleSubmit = useCallback(async () => {
     const trimmed = String(editor?.getDocument?.('markdown') ?? '').trim();
-    if (!trimmed || submitting) return;
+    if (submitting || uploading) return;
+    if (!trimmed && attachments.fileIds.length === 0) return;
     setSubmitting(true);
     try {
-      await addComment(taskId, trimmed, { topicId });
+      await addComment(taskId, trimmed, {
+        fileIds: attachments.fileIds.length > 0 ? attachments.fileIds : undefined,
+        topicId,
+      });
       // Start a NEW topic run that picks up the comment we just attached to the
       // current topic. Do NOT pass continueTopicId — that would flip the
       // already-completed topic back to running and overwrite its operation id.
@@ -47,45 +61,62 @@ const FeedbackInput = memo<FeedbackInputProps>(({ taskId, topicId }) => {
       }
       editor?.cleanDocument?.();
       setHasContent(false);
+      attachments.clear();
       closeTopicDrawer();
     } finally {
       setSubmitting(false);
     }
-  }, [taskId, topicId, editor, addComment, runTask, closeTopicDrawer, submitting]);
+  }, [
+    taskId,
+    topicId,
+    editor,
+    addComment,
+    runTask,
+    closeTopicDrawer,
+    submitting,
+    uploading,
+    attachments,
+  ]);
 
   return (
-    <Flexbox horizontal align={'center'} className={styles.commentInputCard} gap={8}>
-      <Avatar avatar={userAvatar} size={24} style={{ flexShrink: 0 }} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <Editor
-          content={''}
-          editor={editor}
-          enablePasteMarkdown={false}
-          markdownOption={false}
-          placeholder={t('taskDetail.commentPlaceholder')}
-          type={'text'}
-          variant={'chat'}
-          onChange={(ed) => {
-            setHasContent(!ed?.isEmpty);
-          }}
-          onPressEnter={({ event }) => {
-            if (shouldSendOnEnter(event)) {
-              handleSubmit();
-              return true;
-            }
-          }}
-        />
-      </div>
-      <div style={{ flexShrink: 0 }}>
-        <SendButton
-          disabled={!hasContent && !submitting}
-          loading={submitting}
-          shape={'round'}
-          title={t('taskDetail.commentSubmitAndRun')}
-          type={'text'}
-          onClick={handleSubmit}
-        />
-      </div>
+    <Flexbox className={styles.commentInputCard} gap={6}>
+      <Flexbox horizontal align={'center'} gap={8}>
+        <Avatar avatar={userAvatar} size={24} style={{ flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Editor
+            content={''}
+            editor={editor}
+            enablePasteMarkdown={false}
+            markdownOption={false}
+            placeholder={t('taskDetail.commentPlaceholder')}
+            type={'text'}
+            variant={'chat'}
+            onChange={(ed) => {
+              setHasContent(!ed?.isEmpty);
+            }}
+            onPressEnter={({ event }) => {
+              if (shouldSendOnEnter(event)) {
+                handleSubmit();
+                return true;
+              }
+            }}
+          />
+        </div>
+        <Flexbox horizontal align={'center'} gap={4} style={{ flexShrink: 0 }}>
+          <AttachmentUploadButton onFiles={attachments.addFiles} />
+          <SendButton
+            disabled={!canSubmit && !submitting}
+            loading={submitting || uploading}
+            shape={'round'}
+            title={t('taskDetail.commentSubmitAndRun')}
+            type={'text'}
+            onClick={handleSubmit}
+          />
+        </Flexbox>
+      </Flexbox>
+      {hasAttachments && (
+        <AttachmentPreviewList items={attachments.items} onRemove={attachments.removeItem} />
+      )}
     </Flexbox>
   );
 });

@@ -2,7 +2,17 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { getTestDB } from '../../core/getTestDB';
-import { agents, briefs, documents, topics, users } from '../../schemas';
+import {
+  agents,
+  briefs,
+  documents,
+  files,
+  globalFiles,
+  taskCommentsFiles,
+  tasksFiles,
+  topics,
+  users,
+} from '../../schemas';
 import type { LobeChatDatabase } from '../../type';
 import { TaskModel } from '../task';
 
@@ -1112,6 +1122,115 @@ describe('TaskModel', () => {
       expect(childReview).toBeDefined();
       expect(childReview!.rubrics).toHaveLength(1);
       expect(childReview!.rubrics[0].type).toBe('llm-rubric');
+    });
+  });
+
+  describe('files (tasks_files / task_comments_files)', () => {
+    const createFile = async (id: string, uid = userId) => {
+      const hashId = id + '-hash';
+      await serverDB
+        .insert(globalFiles)
+        .values({
+          creator: uid,
+          fileType: 'application/pdf',
+          hashId,
+          size: 100,
+          url: 'http://example.com/' + id,
+        })
+        .onConflictDoNothing();
+      await serverDB
+        .insert(files)
+        .values({
+          fileHash: hashId,
+          fileType: 'application/pdf',
+          id,
+          name: id + '.pdf',
+          size: 100,
+          url: 'http://example.com/' + id,
+          userId: uid,
+        })
+        .onConflictDoNothing();
+      return id;
+    };
+
+    it('setTaskFiles replaces the attached set (idempotent)', async () => {
+      const model = new TaskModel(serverDB, userId);
+      const task = await model.create({ instruction: 'Task with files' });
+      await createFile('file_a');
+      await createFile('file_b');
+      await createFile('file_c');
+
+      await model.setTaskFiles(task.id, ['file_a', 'file_b']);
+      expect(await model.getTaskFileIds(task.id)).toEqual(
+        expect.arrayContaining(['file_a', 'file_b']),
+      );
+
+      // Replacing wipes the old set instead of appending.
+      await model.setTaskFiles(task.id, ['file_c']);
+      const after = await model.getTaskFileIds(task.id);
+      expect(after).toEqual(['file_c']);
+    });
+
+    it('create + fileIds attaches files', async () => {
+      const model = new TaskModel(serverDB, userId);
+      await createFile('file_x');
+      await createFile('file_y');
+
+      const task = await model.create({
+        fileIds: ['file_x', 'file_y'],
+        instruction: 'with attachments',
+      });
+
+      const attached = await model.getTaskFileIds(task.id);
+      expect(attached.sort()).toEqual(['file_x', 'file_y'].sort());
+    });
+
+    it('addComment + fileIds attaches files; getCommentFileIdsMap returns them', async () => {
+      const model = new TaskModel(serverDB, userId);
+      const task = await model.create({ instruction: 'parent' });
+      await createFile('cf_1');
+      await createFile('cf_2');
+
+      const comment = await model.addComment({
+        authorUserId: userId,
+        content: 'see attachments',
+        fileIds: ['cf_1', 'cf_2'],
+        taskId: task.id,
+        userId,
+      });
+
+      const map = await model.getCommentFileIdsMap([comment.id]);
+      expect(map[comment.id]?.sort()).toEqual(['cf_1', 'cf_2'].sort());
+    });
+
+    it('deleting the task cascades into tasks_files', async () => {
+      const model = new TaskModel(serverDB, userId);
+      const task = await model.create({ instruction: 'doomed' });
+      await createFile('file_d');
+      await model.setTaskFiles(task.id, ['file_d']);
+
+      await model.delete(task.id);
+
+      const rows = await serverDB.select().from(tasksFiles);
+      expect(rows.find((r) => r.taskId === task.id)).toBeUndefined();
+    });
+
+    it('deleting a comment cascades into task_comments_files', async () => {
+      const model = new TaskModel(serverDB, userId);
+      const task = await model.create({ instruction: 't' });
+      await createFile('file_e');
+      const comment = await model.addComment({
+        authorUserId: userId,
+        content: 'c',
+        fileIds: ['file_e'],
+        taskId: task.id,
+        userId,
+      });
+
+      await model.deleteComment(comment.id);
+
+      const rows = await serverDB.select().from(taskCommentsFiles);
+      expect(rows.find((r) => r.commentId === comment.id)).toBeUndefined();
     });
   });
 });

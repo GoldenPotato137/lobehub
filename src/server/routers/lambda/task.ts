@@ -38,6 +38,8 @@ const createSchema = z.object({
   automationMode: z.enum(['heartbeat', 'schedule']).optional(),
   createdByAgentId: z.string().optional(),
   description: z.string().optional(),
+  editorData: z.unknown().optional(),
+  fileIds: z.array(z.string()).optional(),
   identifierPrefix: z.string().optional(),
   instruction: z.string().min(1),
   name: z.string().optional(),
@@ -54,6 +56,8 @@ const updateSchema = z.object({
   config: z.record(z.unknown()).optional(),
   context: z.record(z.unknown()).optional(),
   description: z.string().optional(),
+  editorData: z.unknown().optional(),
+  fileIds: z.array(z.string()).optional(),
   // 0 clears the interval (disables heartbeat); any positive value must be
   // ≥600s (10 min) to match the UI minimum and prevent sub-minute ticks if an
   // LLM calls setTaskSchedule with a tiny number.
@@ -207,6 +211,7 @@ export const taskRouter = router({
         authorAgentId: z.string().optional(),
         briefId: z.string().optional(),
         content: z.string().min(1),
+        fileIds: z.array(z.string()).optional(),
         id: z.string(),
         topicId: z.string().optional(),
       }),
@@ -221,6 +226,7 @@ export const taskRouter = router({
           authorUserId: input.authorAgentId ? undefined : ctx.userId,
           briefId: input.briefId,
           content: input.content,
+          fileIds: input.fileIds,
           taskId: task.id,
           topicId: input.topicId,
           userId: ctx.userId,
