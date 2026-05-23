@@ -254,6 +254,8 @@ export interface TaskDetailActivity {
   content?: string;
   createdAt?: string;
   cronJobId?: string | null;
+  /** Comment-only: rich Lexical JSON state. When present, supersedes `content` for rendering. */
+  editorData?: unknown;
   /** Comment-only: files attached to this comment for rendering in the UI. */
   files?: ChatFileItem[];
   id?: string;

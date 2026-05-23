@@ -1,5 +1,5 @@
 import type { TaskDetailActivity } from '@lobechat/types';
-import { Editor, useEditor } from '@lobehub/editor/react';
+import { useEditor } from '@lobehub/editor/react';
 import {
   ActionIcon,
   Avatar,
@@ -18,7 +18,13 @@ import { MessageCircle, MoreHorizontal, Pencil, Trash } from 'lucide-react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import FileListViewer from '@/features/Conversation/Messages/User/components/FileListViewer';
+import { AttachmentUploadButton } from '@/features/AttachmentInput';
+import { EditorCanvas } from '@/features/EditorCanvas';
+import { seedAttachments } from '@/features/EditorCanvas/attachmentRegistry';
+import {
+  getAttachmentFileIdsFromEditor,
+  insertFilesIntoEditor,
+} from '@/features/EditorCanvas/editorAttachments';
 import { useActivityTime } from '@/hooks/useActivityTime';
 import { useTaskStore } from '@/store/task';
 
@@ -42,21 +48,42 @@ const CommentCard = memo<CommentCardProps>(({ activity }) => {
   const content = activity.content || t('taskDetail.activities.fallback.comment');
   const commentId = activity.id;
 
+  const editorData = useMemo(
+    () => ({
+      content: activity.content ?? '',
+      editorData: activity.editorData,
+    }),
+    [activity.content, activity.editorData],
+  );
+
   const handleEdit = useCallback(() => {
+    // Seed URL→fileId map so attachments serialize back to fileIds on save.
+    if (activity.files && activity.files.length > 0) {
+      seedAttachments(activity.files.map((f) => ({ id: f.id, url: f.url })));
+    }
     setIsEditing(true);
-  }, []);
+  }, [activity.files]);
 
   const handleCancel = useCallback(() => {
     setIsEditing(false);
   }, []);
 
+  const handleAttach = useCallback(
+    (files: File[]) => {
+      insertFilesIntoEditor(editor, files);
+    },
+    [editor],
+  );
+
   const handleSave = useCallback(async () => {
-    if (!commentId) return;
+    if (!commentId || submitting) return;
     const next = String(editor?.getDocument?.('markdown') ?? '').trim();
-    if (!next || submitting) return;
+    const json = editor?.getDocument?.('json') as unknown;
+    const fileIds = getAttachmentFileIdsFromEditor(editor);
+    if (!next && fileIds.length === 0) return;
     setSubmitting(true);
     try {
-      await updateComment(commentId, next);
+      await updateComment(commentId, next, { editorData: json, fileIds });
       setIsEditing(false);
     } finally {
       setSubmitting(false);
@@ -124,30 +151,29 @@ const CommentCard = memo<CommentCardProps>(({ activity }) => {
 
       {isEditing ? (
         <>
-          <Editor
-            content={content}
+          <EditorCanvas
             editor={editor}
-            enablePasteMarkdown={false}
-            markdownOption={false}
-            type={'text'}
-            variant={'chat'}
+            editorData={editorData}
+            entityId={commentId}
+            floatingToolbar={false}
+            style={{ paddingBottom: 4 }}
           />
-          <Flexbox horizontal gap={8} justify={'flex-end'}>
-            <Button disabled={submitting} size={'small'} onClick={handleCancel}>
-              {t('taskDetail.comment.cancel')}
-            </Button>
-            <Button loading={submitting} size={'small'} type={'primary'} onClick={handleSave}>
-              {t('taskDetail.comment.save')}
-            </Button>
+          <Flexbox horizontal align={'center'} gap={8} justify={'space-between'}>
+            <AttachmentUploadButton onFiles={handleAttach} />
+            <Flexbox horizontal gap={8}>
+              <Button disabled={submitting} size={'small'} onClick={handleCancel}>
+                {t('taskDetail.comment.cancel')}
+              </Button>
+              <Button loading={submitting} size={'small'} type={'primary'} onClick={handleSave}>
+                {t('taskDetail.comment.save')}
+              </Button>
+            </Flexbox>
           </Flexbox>
         </>
       ) : (
-        <Flexbox gap={8}>
-          <Markdown fontSize={14} variant={'chat'}>
-            {content}
-          </Markdown>
-          {activity.files && activity.files.length > 0 && <FileListViewer items={activity.files} />}
-        </Flexbox>
+        <Markdown fontSize={14} variant={'chat'}>
+          {content}
+        </Markdown>
       )}
 
       {!isEditing && commentId && (

@@ -637,6 +637,7 @@ export class TaskService {
               ? authorMap.get(c.authorUserId)
               : undefined,
           content: c.content,
+          editorData: c.editorData ?? undefined,
           files: files.length > 0 ? files : undefined,
           id: c.id,
           time: toISO(c.createdAt),

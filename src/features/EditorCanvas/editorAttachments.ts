@@ -63,14 +63,28 @@ export const getAttachmentFileIdsFromEditor = (editor: IEditor | undefined): str
 };
 
 /**
- * Open the native file picker and dispatch the appropriate insert command for
- * each selected file. Images go through `INSERT_IMAGE_COMMAND`, every other
- * type goes through `INSERT_FILE_COMMAND`.
+ * Insert the given files inline at the editor's current selection. Images go
+ * through `INSERT_IMAGE_COMMAND`; everything else goes through `INSERT_FILE_COMMAND`.
  */
-export const pickAndInsertAttachments = (editor: IEditor | undefined, accept?: string): void => {
-  if (!editor) return;
+export const insertFilesIntoEditor = (editor: IEditor | undefined, files: File[]): void => {
+  if (!editor || files.length === 0) return;
   const lexicalEditor = editor.getLexicalEditor?.();
   if (!lexicalEditor) return;
+  for (const file of files) {
+    if (file.type.startsWith('image/')) {
+      lexicalEditor.dispatchCommand(INSERT_IMAGE_COMMAND, { file });
+    } else {
+      lexicalEditor.dispatchCommand(INSERT_FILE_COMMAND, { file });
+    }
+  }
+};
+
+/**
+ * Open the native file picker and dispatch the appropriate insert command for
+ * each selected file. Thin wrapper around `insertFilesIntoEditor`.
+ */
+export const pickAndInsertAttachments = (editor: IEditor | undefined, accept?: string): void => {
+  if (!editor?.getLexicalEditor?.()) return;
 
   const input = document.createElement('input');
   input.type = 'file';
@@ -78,14 +92,7 @@ export const pickAndInsertAttachments = (editor: IEditor | undefined, accept?: s
   if (accept) input.accept = accept;
 
   input.addEventListener('change', () => {
-    const files = Array.from(input.files ?? []);
-    for (const file of files) {
-      if (file.type.startsWith('image/')) {
-        lexicalEditor.dispatchCommand(INSERT_IMAGE_COMMAND, { file });
-      } else {
-        lexicalEditor.dispatchCommand(INSERT_FILE_COMMAND, { file });
-      }
-    }
+    insertFilesIntoEditor(editor, Array.from(input.files ?? []));
   });
 
   input.click();

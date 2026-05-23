@@ -211,6 +211,7 @@ export const taskRouter = router({
         authorAgentId: z.string().optional(),
         briefId: z.string().optional(),
         content: z.string().min(1),
+        editorData: z.unknown().optional(),
         fileIds: z.array(z.string()).optional(),
         id: z.string(),
         topicId: z.string().optional(),
@@ -226,6 +227,7 @@ export const taskRouter = router({
           authorUserId: input.authorAgentId ? undefined : ctx.userId,
           briefId: input.briefId,
           content: input.content,
+          editorData: input.editorData as never,
           fileIds: input.fileIds,
           taskId: task.id,
           topicId: input.topicId,
@@ -264,10 +266,20 @@ export const taskRouter = router({
     }),
 
   updateComment: taskProcedure
-    .input(z.object({ commentId: z.string(), content: z.string().min(1) }))
+    .input(
+      z.object({
+        commentId: z.string(),
+        content: z.string().min(1),
+        editorData: z.unknown().optional(),
+        fileIds: z.array(z.string()).optional(),
+      }),
+    )
     .mutation(async ({ input, ctx }) => {
       try {
-        const comment = await ctx.taskModel.updateComment(input.commentId, input.content);
+        const comment = await ctx.taskModel.updateComment(input.commentId, input.content, {
+          editorData: input.editorData,
+          fileIds: input.fileIds,
+        });
         if (!comment) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Comment not found' });
         }

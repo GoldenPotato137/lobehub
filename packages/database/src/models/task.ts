@@ -797,13 +797,26 @@ export class TaskModel {
     return result.length > 0;
   }
 
-  async updateComment(id: string, content: string): Promise<TaskCommentItem | undefined> {
-    const [comment] = await this.db
-      .update(taskComments)
-      .set({ content, updatedAt: new Date() })
-      .where(and(eq(taskComments.id, id), eq(taskComments.userId, this.userId)))
-      .returning();
-    return comment;
+  async updateComment(
+    id: string,
+    content: string,
+    opts?: { editorData?: unknown; fileIds?: string[] },
+  ): Promise<TaskCommentItem | undefined> {
+    return this.db.transaction(async (trx) => {
+      const [comment] = await trx
+        .update(taskComments)
+        .set({
+          content,
+          ...(opts?.editorData !== undefined ? { editorData: opts.editorData as never } : {}),
+          updatedAt: new Date(),
+        })
+        .where(and(eq(taskComments.id, id), eq(taskComments.userId, this.userId)))
+        .returning();
+      if (comment && opts?.fileIds !== undefined) {
+        await this.replaceCommentFilesIn(trx, comment.id, opts.fileIds);
+      }
+      return comment;
+    });
   }
 
   // ========== Files ==========

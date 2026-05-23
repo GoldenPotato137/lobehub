@@ -86,6 +86,12 @@ export interface EditorCanvasProps {
   onInit?: (editor: IEditor) => void;
 
   /**
+   * Press-enter handler. Return true to claim the event (suppresses newline).
+   * Forwarded to the underlying Editor.
+   */
+  onPressEnter?: (props: { editor: IEditor; event: KeyboardEvent }) => boolean | void;
+
+  /**
    * Placeholder text for empty editor
    */
   placeholder?: string;

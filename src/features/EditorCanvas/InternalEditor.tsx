@@ -91,6 +91,7 @@ const InternalEditor = memo<InternalEditorProps>(
     floatingToolbar = true,
     onContentChange,
     onInit,
+    onPressEnter,
     placeholder,
     plugins: customPlugins,
     slashItems,
@@ -285,6 +286,7 @@ const InternalEditor = memo<InternalEditorProps>(
             paddingBottom: 32,
             ...style,
           }}
+          {...(onPressEnter ? { onPressEnter } : {})}
         />
       </div>
     );
