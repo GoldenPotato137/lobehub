@@ -1,5 +1,6 @@
 import type { TaskDetailActivity } from '@lobechat/types';
 import { useEditor } from '@lobehub/editor/react';
+import { LexicalRenderer } from '@lobehub/editor/renderer';
 import {
   ActionIcon,
   Avatar,
@@ -43,7 +44,6 @@ const CommentCard = memo<CommentCardProps>(({ activity }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const editor = useEditor();
-  const displayEditor = useEditor();
 
   const { text: relTime, title: relTimeTitle } = useActivityTime(activity.time);
   const content = activity.content || t('taskDetail.activities.fallback.comment');
@@ -172,13 +172,9 @@ const CommentCard = memo<CommentCardProps>(({ activity }) => {
           </Flexbox>
         </>
       ) : activity.editorData ? (
-        <EditorCanvas
-          editable={false}
-          editor={displayEditor}
-          editorData={editorData}
-          entityId={commentId}
-          floatingToolbar={false}
-          style={{ paddingBottom: 0 }}
+        <LexicalRenderer
+          value={activity.editorData as Parameters<typeof LexicalRenderer>[0]['value']}
+          variant={'chat'}
         />
       ) : (
         <Markdown fontSize={14} variant={'chat'}>
