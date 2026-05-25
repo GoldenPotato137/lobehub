@@ -72,8 +72,35 @@ describe('FloatingChatPanel', () => {
     __resetFloatingChatPanelRegistry();
   });
 
-  it('builds a main-scope context from agentId + topicId', () => {
+  it('builds an ephemeral thread context by default from agentId + topicId', () => {
     const { getByTestId } = render(<FloatingChatPanel agentId="agent-1" topicId="topic-1" />);
+    const ctx = JSON.parse(getByTestId('provider').dataset.context!);
+    expect(ctx).toEqual({
+      agentId: 'agent-1',
+      isNew: true,
+      scope: 'thread',
+      threadId: null,
+      topicId: 'topic-1',
+    });
+  });
+
+  it('drops isNew when an existing threadId is supplied', () => {
+    const { getByTestId } = render(
+      <FloatingChatPanel agentId="agent-1" threadId="thread-1" topicId="topic-1" />,
+    );
+    const ctx = JSON.parse(getByTestId('provider').dataset.context!);
+    expect(ctx).toEqual({
+      agentId: 'agent-1',
+      scope: 'thread',
+      threadId: 'thread-1',
+      topicId: 'topic-1',
+    });
+  });
+
+  it('builds a main-scope context when scope is forced to main', () => {
+    const { getByTestId } = render(
+      <FloatingChatPanel agentId="agent-1" scope="main" topicId="topic-1" />,
+    );
     const ctx = JSON.parse(getByTestId('provider').dataset.context!);
     expect(ctx).toEqual({
       agentId: 'agent-1',
@@ -83,24 +110,16 @@ describe('FloatingChatPanel', () => {
     });
   });
 
-  it('switches scope to thread when threadId is provided', () => {
+  it('forwards documentId into the conversation context for document-aware injection', () => {
     const { getByTestId } = render(
-      <FloatingChatPanel agentId="agent-1" threadId="thread-1" topicId="topic-1" />,
-    );
-    const ctx = JSON.parse(getByTestId('provider').dataset.context!);
-    expect(ctx.scope).toBe('thread');
-    expect(ctx.threadId).toBe('thread-1');
-  });
-
-  it('supports page-scoped context with the active document id', () => {
-    const { getByTestId } = render(
-      <FloatingChatPanel agentId="agent-1" documentId="doc-1" scope="page" topicId="topic-1" />,
+      <FloatingChatPanel agentId="agent-1" documentId="doc-1" topicId="topic-1" />,
     );
     const ctx = JSON.parse(getByTestId('provider').dataset.context!);
     expect(ctx).toEqual({
       agentId: 'agent-1',
       documentId: 'doc-1',
-      scope: 'page',
+      isNew: true,
+      scope: 'thread',
       threadId: null,
       topicId: 'topic-1',
     });

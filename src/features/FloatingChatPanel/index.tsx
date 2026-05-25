@@ -67,11 +67,22 @@ export interface FloatingChatPanelProps {
    */
   actionsBar?: ActionsBarConfig;
   activeSnapPoint?: number;
-  /** Agent identifier. */
+  /**
+   * Agent document row id (`agent_documents.id`) for the document the user is
+   * viewing. When supplied, the active document is injected with
+   * `agent_document_id` so LLM tool calls (`readDocument` / `modifyNodes`) can
+   * use it directly without a `listDocuments` reverse lookup.
+   */
+  agentDocumentId?: string;
   agentId: string;
   className?: string;
   dismissible?: boolean;
-  /** Current document identifier for page-scoped conversations. */
+  /**
+   * Active document id for the conversation context. Passed through so the
+   * `ActiveTopicDocumentContextInjector` can tell the LLM which agent document
+   * the user is currently viewing (e.g. when opened from a document preview
+   * portal). Omit when no document is in focus.
+   */
   documentId?: string;
   headerActions?: ReactNode;
   /**
@@ -86,10 +97,16 @@ export interface FloatingChatPanelProps {
   onOpenChange?: (open: boolean) => void;
   onSnapPointChange?: (point: number) => void;
   open?: boolean;
-  /** Optional conversation scope override for non-thread contexts. */
-  scope?: 'main' | 'page';
+  /**
+   * Conversation scope. Defaults to `'thread'` for ephemeral side-chat usage.
+   * When `'thread'` and `threadId` is absent, the context is marked `isNew`
+   * so a fresh thread can be created on first send (caller must supply
+   * `sourceMessageId` + `threadType` via `hooks` / context override if real
+   * thread persistence is required).
+   */
+  scope?: 'main' | 'thread';
   snapPoints?: number[];
-  /** Optional thread identifier. When provided, scope becomes `'thread'`. */
+  /** Opens an existing thread when set; otherwise the panel starts ephemeral. */
   threadId?: string | null;
   title?: ReactNode;
   /** Topic identifier. `null` means a new / unpersisted conversation. */
@@ -101,17 +118,12 @@ export interface FloatingChatPanelProps {
 /**
  * FloatingChatPanel
  *
- * A reusable floating conversation panel. Composes ChatList + MainChatInput inside
- * a container shell. Consumers provide conversation coordinates via flat
- * `agentId`/`topicId` props; the component builds its own `ConversationContext`
- * internally.
+ * Reusable floating conversation panel — composes `ChatList` + `ChatInput`
+ * inside a `FloatingSheet`. Consumers provide conversation coordinates via
+ * flat `agentId` / `topicId` / `threadId` props; the panel builds its own
+ * `ConversationContext` internally.
  *
- * @FIXME ⚠️ Single instance per page. Mounting a second FloatingChatPanel while one is
- * already mounted will throw. See `./guard.ts` for the rationale.
- *
- * @FIXME ⚠️ Must not coexist with the main-page ConversationArea (both use MainChatInput,
- * which writes to the global `useChatStore.mainInputEditor` slot). This is NOT
- * enforced at runtime — consumer responsibility.
+ * Single instance per page (see `./guard.ts`).
  */
 const FloatingChatPanel = memo<FloatingChatPanelProps>(
   ({
@@ -119,7 +131,8 @@ const FloatingChatPanel = memo<FloatingChatPanelProps>(
     topicId,
     threadId = null,
     documentId,
-    scope,
+    agentDocumentId,
+    scope = 'thread',
     actionsBar,
     hooks,
 
@@ -133,15 +146,19 @@ const FloatingChatPanel = memo<FloatingChatPanelProps>(
   }) => {
     useSingleInstanceGuard();
 
+    const isCreatingNewThread = scope === 'thread' && !threadId;
+
     const context = useMemo<ConversationContext>(
       () => ({
         agentId,
-        documentId,
-        scope: threadId ? 'thread' : (scope ?? 'main'),
+        ...(agentDocumentId ? { agentDocumentId } : {}),
+        ...(documentId ? { documentId } : {}),
+        ...(isCreatingNewThread ? { isNew: true } : {}),
+        scope,
         threadId,
         topicId,
       }),
-      [agentId, documentId, scope, topicId, threadId],
+      [agentId, agentDocumentId, documentId, isCreatingNewThread, scope, topicId, threadId],
     );
 
     const chatKey = useMemo(() => messageMapKey(context), [context]);
