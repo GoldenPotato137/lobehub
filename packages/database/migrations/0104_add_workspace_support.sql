@@ -384,3 +384,16 @@ AND "permission_id" IN (
 UPDATE "rbac_roles"
 SET "description" = 'Read-only access to workspace content.'
 WHERE "name" = 'workspace_viewer';
+--> statement-breakpoint
+ALTER TABLE "agent_eval_experiments" ADD COLUMN IF NOT EXISTS "workspace_id" text;--> statement-breakpoint
+ALTER TABLE "agent_eval_experiment_benchmarks" ADD COLUMN IF NOT EXISTS "workspace_id" text;--> statement-breakpoint
+ALTER TABLE "llm_generation_tracing" ADD COLUMN IF NOT EXISTS "workspace_id" text;--> statement-breakpoint
+ALTER TABLE "agent_eval_experiments" DROP CONSTRAINT IF EXISTS "agent_eval_experiments_workspace_id_workspaces_id_fk";--> statement-breakpoint
+ALTER TABLE "agent_eval_experiments" ADD CONSTRAINT "agent_eval_experiments_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "agent_eval_experiment_benchmarks" DROP CONSTRAINT IF EXISTS "agent_eval_experiment_benchmarks_workspace_id_workspaces_id_fk";--> statement-breakpoint
+ALTER TABLE "agent_eval_experiment_benchmarks" ADD CONSTRAINT "agent_eval_experiment_benchmarks_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "llm_generation_tracing" DROP CONSTRAINT IF EXISTS "llm_generation_tracing_workspace_id_workspaces_id_fk";--> statement-breakpoint
+ALTER TABLE "llm_generation_tracing" ADD CONSTRAINT "llm_generation_tracing_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "agent_eval_experiments_workspace_id_idx" ON "agent_eval_experiments" USING btree ("workspace_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "agent_eval_experiment_benchmarks_workspace_id_idx" ON "agent_eval_experiment_benchmarks" USING btree ("workspace_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "llm_generation_tracing_workspace_id_idx" ON "llm_generation_tracing" USING btree ("workspace_id");

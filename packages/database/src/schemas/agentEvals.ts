@@ -121,6 +121,10 @@ export const agentEvalDatasets = pgTable(
     evalMode: text('eval_mode', { enum: evalModes }),
     evalConfig: jsonb('eval_config').$type<EvalConfig>(),
 
+    sourceExperimentId: text('source_experiment_id').references(() => agentEvalExperiments.id, {
+      onDelete: 'set null',
+    }),
+
     metadata: jsonb('metadata').$type<Record<string, unknown>>(),
 
     ...timestamps,
@@ -136,6 +140,7 @@ export const agentEvalDatasets = pgTable(
       .on(t.workspaceId, t.identifier)
       .where(sql`${t.workspaceId} IS NOT NULL`),
     index('agent_eval_datasets_benchmark_id_idx').on(t.benchmarkId),
+    index('agent_eval_datasets_source_experiment_id_idx').on(t.sourceExperimentId),
     index('agent_eval_datasets_user_id_idx').on(t.userId),
     index('agent_eval_datasets_workspace_id_idx').on(t.workspaceId),
   ],
@@ -201,6 +206,9 @@ export const agentEvalRuns = pgTable(
 
     targetAgentId: text('target_agent_id').references(() => agents.id, { onDelete: 'cascade' }),
 
+    experimentId: text('experiment_id').references(() => agentEvalExperiments.id),
+    parentRunId: text('parent_run_id').references(() => agentEvalRuns.id),
+
     userId: text('user_id')
       .references(() => users.id, { onDelete: 'cascade' })
       .notNull(),
@@ -224,6 +232,8 @@ export const agentEvalRuns = pgTable(
   },
   (t) => [
     index('agent_eval_runs_dataset_id_idx').on(t.datasetId),
+    index('agent_eval_runs_experiment_id_idx').on(t.experimentId),
+    index('agent_eval_runs_parent_run_id_idx').on(t.parentRunId),
     index('agent_eval_runs_user_id_idx').on(t.userId),
     index('agent_eval_runs_workspace_id_idx').on(t.workspaceId),
     index('agent_eval_runs_status_idx').on(t.status),
@@ -278,3 +288,66 @@ export const agentEvalRunTopics = pgTable(
 
 export type NewAgentEvalRunTopic = typeof agentEvalRunTopics.$inferInsert;
 export type AgentEvalRunTopicItem = typeof agentEvalRunTopics.$inferSelect;
+
+// ============================================
+// 6. agent_eval_experiments (Evaluation Experiments)
+// ============================================
+export const agentEvalExperiments = pgTable(
+  'agent_eval_experiments',
+  {
+    id: text('id')
+      .$defaultFn(() => idGenerator('evalExperiments'))
+      .primaryKey(),
+
+    userId: text('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    workspaceId: text('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }),
+
+    name: text('name').notNull(),
+    description: text('description'),
+
+    metadata: jsonb('metadata').$type<Record<string, unknown>>(),
+
+    accessedAt: timestamptz('accessed_at').notNull().defaultNow(),
+    ...timestamps,
+  },
+  (t) => [
+    index('agent_eval_experiments_user_id_idx').on(t.userId),
+    index('agent_eval_experiments_workspace_id_idx').on(t.workspaceId),
+  ],
+);
+
+export type NewAgentEvalExperiment = typeof agentEvalExperiments.$inferInsert;
+export type AgentEvalExperimentItem = typeof agentEvalExperiments.$inferSelect;
+
+// ============================================
+// 7. agent_eval_experiment_benchmarks (Experiment-Benchmark Junction)
+// ============================================
+export const agentEvalExperimentBenchmarks = pgTable(
+  'agent_eval_experiment_benchmarks',
+  {
+    experimentId: text('experiment_id')
+      .references(() => agentEvalExperiments.id, { onDelete: 'cascade' })
+      .notNull(),
+    benchmarkId: text('benchmark_id')
+      .references(() => agentEvalBenchmarks.id, { onDelete: 'cascade' })
+      .notNull(),
+
+    userId: text('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+    workspaceId: text('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }),
+
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.experimentId, t.benchmarkId] }),
+    index('agent_eval_experiment_benchmarks_benchmark_id_idx').on(t.benchmarkId),
+    index('agent_eval_experiment_benchmarks_user_id_idx').on(t.userId),
+    index('agent_eval_experiment_benchmarks_workspace_id_idx').on(t.workspaceId),
+  ],
+);
+
+export type NewAgentEvalExperimentBenchmark = typeof agentEvalExperimentBenchmarks.$inferInsert;
+export type AgentEvalExperimentBenchmarkItem = typeof agentEvalExperimentBenchmarks.$inferSelect;
