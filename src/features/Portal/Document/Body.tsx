@@ -218,6 +218,7 @@ const DocumentBody = memo(() => {
           agentDocumentId={agentDocumentId}
           agentId={activeAgentId}
           documentId={documentId ?? undefined}
+          key={`${activeAgentId}:${activeTopicId ?? 'none'}:${documentId ?? 'none'}`}
           topicId={activeTopicId ?? null}
         />
       )}

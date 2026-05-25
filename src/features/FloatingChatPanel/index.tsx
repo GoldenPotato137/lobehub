@@ -146,18 +146,32 @@ const FloatingChatPanel = memo<FloatingChatPanelProps>(
   }) => {
     useSingleInstanceGuard();
 
-    // Track the active thread internally so a new thread created on first send
-    // can be adopted in-place without unmounting/remounting the panel.
-    const [internalThreadId, setInternalThreadId] = useState<string | null>(threadId);
+    // Adopt the global portal-thread state so streaming AI chunks (which the
+    // lifecycle writes under the persisted `_<threadId>` key the moment the
+    // server returns `createdThreadId`) become visible in this panel without
+    // waiting for the post-stream `onAfterMessageCreate` hook. `lifecycle.ts`
+    // calls `syncThreadInPortal` *before* stream chunks start arriving, so
+    // subscribing here flips this panel's chatKey from `_new` to the persisted
+    // thread in time to render the stream.
+    const storePortalThreadId = useChatStore((s) => s.portalThreadId);
+    const effectiveThreadId = threadId ?? storePortalThreadId ?? null;
+
+    // Clear any stale `portalThreadId` left by a sibling portal session so a
+    // fresh mount starts in `isNew` state. Body's `key` already remounts the
+    // panel when `(agentId, topicId, documentId)` changes; this guards the
+    // first paint of that fresh mount against a leftover thread id.
     useEffect(() => {
-      setInternalThreadId(threadId);
+      if (threadId) return;
+      if (useChatStore.getState().portalThreadId) {
+        useChatStore.setState({ portalThreadId: undefined });
+      }
     }, [threadId]);
 
     // Source message for `newThread`: the latest message of the topic's main
     // scope. Without this, `conversationLifecycle.ts:215` treats the send as a
     // plain topic message and never creates a thread row. Falls back to
     // ephemeral (no source) when the topic has no messages yet.
-    const isCreatingNewThread = scope === 'thread' && !internalThreadId;
+    const isCreatingNewThread = scope === 'thread' && !effectiveThreadId;
     const sourceMessageId = useChatStore((s) => {
       if (!isCreatingNewThread || !topicId) return undefined;
       const mainKey = messageMapKey({ agentId, topicId });
@@ -182,14 +196,14 @@ const FloatingChatPanel = memo<FloatingChatPanelProps>(
             ? { isNew: true }
             : {}),
         scope,
-        threadId: internalThreadId,
+        threadId: effectiveThreadId,
         topicId,
       }),
       [
         agentId,
         agentDocumentId,
         documentId,
-        internalThreadId,
+        effectiveThreadId,
         isCreatingNewThread,
         scope,
         sourceMessageId,
@@ -198,8 +212,21 @@ const FloatingChatPanel = memo<FloatingChatPanelProps>(
     );
 
     const chatKey = useMemo(() => messageMapKey(context), [context]);
-    const messages = useChatStore((s) => s.dbMessagesMap[chatKey]);
+    const rawMessages = useChatStore((s) => s.dbMessagesMap[chatKey]);
     const replaceMessages = useChatStore((s) => s.replaceMessages);
+
+    // Document portal chat is an isolated doc-anchored side conversation —
+    // never the continuation of the main topic. Pre-send (no thread yet) we
+    // render empty regardless of whatever the `_new` thread key may hold from
+    // a sibling flow; post-send we keep only the thread's own rows, since
+    // `lifecycle.ts:replaceMessages(data.messages, { context: { threadId } })`
+    // also dumps every main-topic parent message into the thread key for the
+    // Portal/Thread parent → divider → thread layout we don't want here.
+    const messages = useMemo(() => {
+      if (!effectiveThreadId) return [];
+      if (!rawMessages) return rawMessages;
+      return rawMessages.filter((m) => m.threadId === effectiveThreadId);
+    }, [rawMessages, effectiveThreadId]);
 
     const operationState = useOperationState(context);
     const defaultActionsBar = useActionsBarConfig();
@@ -219,7 +246,7 @@ const FloatingChatPanel = memo<FloatingChatPanelProps>(
     const chatFollowUpHooks = useChatFollowUp({
       agentChatConfig,
       conversationKey: chatKey,
-      threadId: internalThreadId ?? undefined,
+      threadId: effectiveThreadId ?? undefined,
       topicId: topicId ?? undefined,
     });
 
@@ -232,19 +259,6 @@ const FloatingChatPanel = memo<FloatingChatPanelProps>(
             // into view before the AI response streams in — not after it finishes.
             onBeforeSendMessage: async () => {
               setActiveSnapPoint(MAX_SNAP_POINT);
-            },
-            // Adopt the freshly created thread in-panel: refresh the thread
-            // list (so the sidebar `ThreadList` picks it up) and pivot this
-            // panel's context from `isNew` to the persisted threadId. We
-            // deliberately skip `openThreadInPortal` — that would push a Thread
-            // view onto the portal stack and cover the document the user is
-            // looking at.
-            onAfterMessageCreate: async ({ createdThreadId }) => {
-              if (!createdThreadId) return;
-              const state = useChatStore.getState();
-              await state.refreshThreads();
-              await state.refreshMessages();
-              setInternalThreadId(createdThreadId);
             },
           },
           chatFollowUpHooks,
@@ -278,11 +292,17 @@ const FloatingChatPanel = memo<FloatingChatPanelProps>(
       <FloatingSheet {...sheetProps}>
         <div className={styles.body}>
           <ConversationProvider
+            // Doc-anchored side chat owns its messages via the external
+            // `messages` prop (filtered from `dbMessagesMap` above). Letting
+            // ConversationProvider fire its own `useFetchMessages` here would
+            // pull the main-topic history from the server and drop it into
+            // this panel — exactly the parent dump A-mode is meant to avoid.
+            hasInitMessages
+            skipFetch
             actionsBar={resolvedActionsBar}
             context={context}
-            hasInitMessages={!!messages}
             hooks={mergedHooks}
-            messages={messages}
+            messages={messages ?? []}
             operationState={operationState}
             onMessagesChange={handleMessagesChange}
           >

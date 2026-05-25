@@ -58,13 +58,22 @@ vi.mock('@/hooks/useOperationState', () => ({
 const mockChatState = vi.hoisted(() => ({
   current: {
     dbMessagesMap: {} as Record<string, Array<{ id: string; threadId?: string | null }>>,
+    portalThreadId: undefined as string | undefined,
     replaceMessages: vi.fn(),
   },
 }));
 
-vi.mock('@/store/chat', () => ({
-  useChatStore: (selector: any) => selector(mockChatState.current),
-}));
+vi.mock('@/store/chat', () => {
+  const useChatStore: any = (selector: any) => selector(mockChatState.current);
+  useChatStore.getState = () => mockChatState.current;
+  useChatStore.setState = (patch: any) => {
+    Object.assign(
+      mockChatState.current,
+      typeof patch === 'function' ? patch(mockChatState.current) : patch,
+    );
+  };
+  return { useChatStore };
+});
 
 vi.mock('@/store/chat/utils/messageMapKey', () => ({
   messageMapKey: (ctx: any) => `${ctx.agentId}:${ctx.topicId}:${ctx.threadId}`,
@@ -74,6 +83,7 @@ describe('FloatingChatPanel', () => {
   beforeEach(() => {
     __resetFloatingChatPanelRegistry();
     mockChatState.current.dbMessagesMap = {};
+    mockChatState.current.portalThreadId = undefined;
   });
 
   it('builds an ephemeral thread context by default from agentId + topicId', () => {
