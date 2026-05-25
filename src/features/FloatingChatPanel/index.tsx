@@ -1,10 +1,10 @@
 'use client';
 
-import { type UIChatMessage } from '@lobechat/types';
+import { ThreadType, type UIChatMessage } from '@lobechat/types';
 import { FloatingSheet, type FloatingSheetProps } from '@lobehub/ui/base-ui';
 import { createStaticStyles } from 'antd-style';
 import type { ReactNode } from 'react';
-import { memo, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 
 import {
   type ActionsBarConfig,
@@ -146,19 +146,55 @@ const FloatingChatPanel = memo<FloatingChatPanelProps>(
   }) => {
     useSingleInstanceGuard();
 
-    const isCreatingNewThread = scope === 'thread' && !threadId;
+    // Track the active thread internally so a new thread created on first send
+    // can be adopted in-place without unmounting/remounting the panel.
+    const [internalThreadId, setInternalThreadId] = useState<string | null>(threadId);
+    useEffect(() => {
+      setInternalThreadId(threadId);
+    }, [threadId]);
+
+    // Source message for `newThread`: the latest message of the topic's main
+    // scope. Without this, `conversationLifecycle.ts:215` treats the send as a
+    // plain topic message and never creates a thread row. Falls back to
+    // ephemeral (no source) when the topic has no messages yet.
+    const isCreatingNewThread = scope === 'thread' && !internalThreadId;
+    const sourceMessageId = useChatStore((s) => {
+      if (!isCreatingNewThread || !topicId) return undefined;
+      const mainKey = messageMapKey({ agentId, topicId });
+      const mainMessages = s.dbMessagesMap[mainKey];
+      if (!mainMessages?.length) return undefined;
+      // Anchor on the latest main-scope message (ignore thread-scoped rows).
+      for (let i = mainMessages.length - 1; i >= 0; i -= 1) {
+        const msg = mainMessages[i]!;
+        if (!msg.threadId) return msg.id;
+      }
+      return undefined;
+    });
 
     const context = useMemo<ConversationContext>(
       () => ({
         agentId,
         ...(agentDocumentId ? { agentDocumentId } : {}),
         ...(documentId ? { documentId } : {}),
-        ...(isCreatingNewThread ? { isNew: true } : {}),
+        ...(isCreatingNewThread && sourceMessageId
+          ? { isNew: true, sourceMessageId, threadType: ThreadType.Standalone }
+          : isCreatingNewThread
+            ? { isNew: true }
+            : {}),
         scope,
-        threadId,
+        threadId: internalThreadId,
         topicId,
       }),
-      [agentId, agentDocumentId, documentId, isCreatingNewThread, scope, topicId, threadId],
+      [
+        agentId,
+        agentDocumentId,
+        documentId,
+        internalThreadId,
+        isCreatingNewThread,
+        scope,
+        sourceMessageId,
+        topicId,
+      ],
     );
 
     const chatKey = useMemo(() => messageMapKey(context), [context]);
@@ -183,7 +219,7 @@ const FloatingChatPanel = memo<FloatingChatPanelProps>(
     const chatFollowUpHooks = useChatFollowUp({
       agentChatConfig,
       conversationKey: chatKey,
-      threadId: threadId ?? undefined,
+      threadId: internalThreadId ?? undefined,
       topicId: topicId ?? undefined,
     });
 
@@ -196,6 +232,19 @@ const FloatingChatPanel = memo<FloatingChatPanelProps>(
             // into view before the AI response streams in — not after it finishes.
             onBeforeSendMessage: async () => {
               setActiveSnapPoint(MAX_SNAP_POINT);
+            },
+            // Adopt the freshly created thread in-panel: refresh the thread
+            // list (so the sidebar `ThreadList` picks it up) and pivot this
+            // panel's context from `isNew` to the persisted threadId. We
+            // deliberately skip `openThreadInPortal` — that would push a Thread
+            // view onto the portal stack and cover the document the user is
+            // looking at.
+            onAfterMessageCreate: async ({ createdThreadId }) => {
+              if (!createdThreadId) return;
+              const state = useChatStore.getState();
+              await state.refreshThreads();
+              await state.refreshMessages();
+              setInternalThreadId(createdThreadId);
             },
           },
           chatFollowUpHooks,
