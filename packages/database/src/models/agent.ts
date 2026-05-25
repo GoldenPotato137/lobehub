@@ -17,19 +17,34 @@ import {
   sessions,
 } from '../schemas';
 import type { LobeChatDatabase } from '../type';
+import { buildWorkspacePayload, buildWorkspaceWhere } from '../utils/workspace';
 
 export class AgentModel {
   private userId: string;
   private db: LobeChatDatabase;
+  private workspaceId?: string;
 
-  constructor(db: LobeChatDatabase, userId: string) {
+  constructor(db: LobeChatDatabase, userId: string, workspaceId?: string) {
     this.userId = userId;
     this.db = db;
+    this.workspaceId = workspaceId;
   }
+
+  /**
+   * Compat-mode ownership predicate for the `agents` table.
+   * - team mode (workspaceId set): `workspace_id = ?` (every member sees the same agents)
+   * - personal mode: `user_id = ? AND workspace_id IS NULL`
+   */
+  private ownership = () =>
+    buildWorkspaceWhere({ userId: this.userId, workspaceId: this.workspaceId }, agents);
+
+  /** Same predicate but for the `sessions` table (used in delete cascade). */
+  private sessionsOwnership = () =>
+    buildWorkspaceWhere({ userId: this.userId, workspaceId: this.workspaceId }, sessions);
 
   getAgentConfigById = async (id: string) => {
     const agent = await this.db.query.agents.findFirst({
-      where: and(eq(agents.id, id), eq(agents.userId, this.userId)),
+      where: and(eq(agents.id, id), this.ownership()),
     });
 
     if (!agent) return null;
@@ -79,7 +94,7 @@ export class AgentModel {
     const { keyword, limit = 9999, offset = 0 } = params ?? {};
     // Include agents where virtual is false OR null (legacy data without virtual field)
     const baseConditions = and(
-      eq(agents.userId, this.userId),
+      this.ownership(),
       or(eq(agents.virtual, false), isNull(agents.virtual)),
     );
 
@@ -122,7 +137,7 @@ export class AgentModel {
         title: agents.title,
       })
       .from(agents)
-      .where(and(eq(agents.userId, this.userId), inArray(agents.id, ids)));
+      .where(and(this.ownership(), inArray(agents.id, ids)));
 
     return rows.map(({ slug, ...row }) => ({
       ...row,
@@ -136,10 +151,7 @@ export class AgentModel {
    */
   getAgentConfig = async (idOrSlug: string) => {
     const agent = await this.db.query.agents.findFirst({
-      where: and(
-        eq(agents.userId, this.userId),
-        or(eq(agents.id, idOrSlug), eq(agents.slug, idOrSlug)),
-      ),
+      where: and(this.ownership(), or(eq(agents.id, idOrSlug), eq(agents.slug, idOrSlug))),
     });
 
     if (!agent) return null;
@@ -231,12 +243,14 @@ export class AgentModel {
     knowledgeBaseId: string,
     enabled: boolean = true,
   ) => {
-    return this.db.insert(agentsKnowledgeBases).values({
-      agentId,
-      enabled,
-      knowledgeBaseId,
-      userId: this.userId,
-    });
+    return this.db
+      .insert(agentsKnowledgeBases)
+      .values(
+        buildWorkspacePayload(
+          { userId: this.userId, workspaceId: this.workspaceId },
+          { agentId, enabled, knowledgeBaseId },
+        ),
+      );
   };
 
   deleteAgentKnowledgeBase = async (agentId: string, knowledgeBaseId: string) => {
@@ -286,7 +300,12 @@ export class AgentModel {
     return this.db
       .insert(agentsFiles)
       .values(
-        needToInsertFileIds.map((fileId) => ({ agentId, enabled, fileId, userId: this.userId })),
+        needToInsertFileIds.map((fileId) =>
+          buildWorkspacePayload(
+            { userId: this.userId, workspaceId: this.workspaceId },
+            { agentId, enabled, fileId },
+          ),
+        ),
       );
   };
 
@@ -329,11 +348,11 @@ export class AgentModel {
       if (sessionIds.length > 0) {
         await trx
           .delete(sessions)
-          .where(and(inArray(sessions.id, sessionIds), eq(sessions.userId, this.userId)));
+          .where(and(inArray(sessions.id, sessionIds), this.sessionsOwnership()));
       }
 
       // 4. Delete the agent itself
-      return trx.delete(agents).where(and(eq(agents.id, agentId), eq(agents.userId, this.userId)));
+      return trx.delete(agents).where(and(eq(agents.id, agentId), this.ownership()));
     });
   };
 
@@ -345,9 +364,7 @@ export class AgentModel {
   batchDelete = async (agentIds: string[]) => {
     if (agentIds.length === 0) return;
 
-    return this.db
-      .delete(agents)
-      .where(and(eq(agents.userId, this.userId), inArray(agents.id, agentIds)));
+    return this.db.delete(agents).where(and(this.ownership(), inArray(agents.id, agentIds)));
   };
 
   toggleFile = async (agentId: string, fileId: string, enabled?: boolean) => {
@@ -371,11 +388,13 @@ export class AgentModel {
     const [result] = await this.db
       .insert(agents)
       .values([
-        {
-          ...config,
-          model: typeof config.model === 'string' ? config.model : null,
-          userId: this.userId,
-        },
+        buildWorkspacePayload(
+          { userId: this.userId, workspaceId: this.workspaceId },
+          {
+            ...config,
+            model: typeof config.model === 'string' ? config.model : null,
+          },
+        ),
       ])
       .returning();
 
@@ -392,11 +411,15 @@ export class AgentModel {
     return this.db
       .insert(agents)
       .values(
-        configs.map((config) => ({
-          ...config,
-          model: typeof config.model === 'string' ? config.model : null,
-          userId: this.userId,
-        })),
+        configs.map((config) =>
+          buildWorkspacePayload(
+            { userId: this.userId, workspaceId: this.workspaceId },
+            {
+              ...config,
+              model: typeof config.model === 'string' ? config.model : null,
+            },
+          ),
+        ),
       )
       .returning();
   };
@@ -405,7 +428,7 @@ export class AgentModel {
     return this.db
       .update(agents)
       .set({ ...data, updatedAt: new Date() })
-      .where(and(eq(agents.id, agentId), eq(agents.userId, this.userId)));
+      .where(and(eq(agents.id, agentId), this.ownership()));
   };
 
   touchUpdatedAt = async (agentId: string) => {
@@ -418,7 +441,7 @@ export class AgentModel {
    */
   checkByMarketIdentifier = async (marketIdentifier: string): Promise<boolean> => {
     const result = await this.db.query.agents.findFirst({
-      where: and(eq(agents.marketIdentifier, marketIdentifier), eq(agents.userId, this.userId)),
+      where: and(eq(agents.marketIdentifier, marketIdentifier), this.ownership()),
     });
     return !!result;
   };
@@ -432,7 +455,7 @@ export class AgentModel {
     const result = await this.db.query.agents.findFirst({
       columns: { id: true },
       orderBy: (agents, { desc }) => [desc(agents.updatedAt)],
-      where: and(eq(agents.marketIdentifier, marketIdentifier), eq(agents.userId, this.userId)),
+      where: and(eq(agents.marketIdentifier, marketIdentifier), this.ownership()),
     });
     return result?.id ?? null;
   };
@@ -447,7 +470,7 @@ export class AgentModel {
       columns: { id: true },
       orderBy: (agents, { desc }) => [desc(agents.updatedAt)],
       where: and(
-        eq(agents.userId, this.userId),
+        this.ownership(),
         sql`${agents.params}->>'forkedFromIdentifier' = ${forkedFromIdentifier}`,
       ),
     });
@@ -458,7 +481,7 @@ export class AgentModel {
     if (!data || Object.keys(data).length === 0) return;
 
     const agent = await this.db.query.agents.findFirst({
-      where: and(eq(agents.id, agentId), eq(agents.userId, this.userId)),
+      where: and(eq(agents.id, agentId), this.ownership()),
     });
 
     if (!agent) return;
@@ -511,7 +534,7 @@ export class AgentModel {
     return this.db
       .update(agents)
       .set(updateData)
-      .where(and(eq(agents.id, agentId), eq(agents.userId, this.userId)));
+      .where(and(eq(agents.id, agentId), this.ownership()));
   };
 
   /**
@@ -521,7 +544,7 @@ export class AgentModel {
     const result = await this.db
       .update(agents)
       .set({ sessionGroupId, updatedAt: new Date() })
-      .where(and(eq(agents.id, agentId), eq(agents.userId, this.userId)))
+      .where(and(eq(agents.id, agentId), this.ownership()))
       .returning();
 
     return result[0];
@@ -534,7 +557,7 @@ export class AgentModel {
   duplicate = async (agentId: string, newTitle?: string): Promise<{ agentId: string } | null> => {
     // Get the source agent
     const sourceAgent = await this.db.query.agents.findFirst({
-      where: and(eq(agents.id, agentId), eq(agents.userId, this.userId)),
+      where: and(eq(agents.id, agentId), this.ownership()),
     });
 
     if (!sourceAgent) return null;
@@ -542,32 +565,35 @@ export class AgentModel {
     // Create new agent with explicit include fields
     const [newAgent] = await this.db
       .insert(agents)
-      .values({
-        avatar: sourceAgent.avatar,
-        backgroundColor: sourceAgent.backgroundColor,
-        chatConfig: sourceAgent.chatConfig,
-        description: sourceAgent.description,
-        fewShots: sourceAgent.fewShots,
-        model: sourceAgent.model,
-        openingMessage: sourceAgent.openingMessage,
-        openingQuestions: sourceAgent.openingQuestions,
-        params: sourceAgent.params,
-        pinned: sourceAgent.pinned,
-        // Config
-        plugins: sourceAgent.plugins,
-        provider: sourceAgent.provider,
+      .values(
+        buildWorkspacePayload(
+          { userId: this.userId, workspaceId: this.workspaceId },
+          {
+            avatar: sourceAgent.avatar,
+            backgroundColor: sourceAgent.backgroundColor,
+            chatConfig: sourceAgent.chatConfig,
+            description: sourceAgent.description,
+            fewShots: sourceAgent.fewShots,
+            model: sourceAgent.model,
+            openingMessage: sourceAgent.openingMessage,
+            openingQuestions: sourceAgent.openingQuestions,
+            params: sourceAgent.params,
+            pinned: sourceAgent.pinned,
+            // Config
+            plugins: sourceAgent.plugins,
+            provider: sourceAgent.provider,
 
-        // Session group
-        sessionGroupId: sourceAgent.sessionGroupId,
-        systemRole: sourceAgent.systemRole,
+            // Session group
+            sessionGroupId: sourceAgent.sessionGroupId,
+            systemRole: sourceAgent.systemRole,
 
-        tags: sourceAgent.tags,
-        // Metadata
-        title: newTitle || (sourceAgent.title ? `${sourceAgent.title} (Copy)` : 'Copy'),
-        tts: sourceAgent.tts,
-        // User
-        userId: this.userId,
-      })
+            tags: sourceAgent.tags,
+            // Metadata
+            title: newTitle || (sourceAgent.title ? `${sourceAgent.title} (Copy)` : 'Copy'),
+            tts: sourceAgent.tts,
+          },
+        ),
+      )
       .returning();
 
     return { agentId: newAgent.id };
@@ -581,7 +607,7 @@ export class AgentModel {
   getBuiltinAgent = async (slug: string): Promise<AgentItem | null> => {
     // 1. First try to find existing agent by slug
     const existing = await this.db.query.agents.findFirst({
-      where: and(eq(agents.slug, slug), eq(agents.userId, this.userId)),
+      where: and(eq(agents.slug, slug), this.ownership()),
     });
 
     if (existing) return existing;
@@ -596,7 +622,7 @@ export class AgentModel {
         .from(sessions)
         .innerJoin(agentsToSessions, eq(sessions.id, agentsToSessions.sessionId))
         .innerJoin(agents, eq(agentsToSessions.agentId, agents.id))
-        .where(and(eq(sessions.slug, INBOX_SESSION_ID), eq(sessions.userId, this.userId)))
+        .where(and(eq(sessions.slug, INBOX_SESSION_ID), this.sessionsOwnership()))
         .limit(1);
 
       if (result.length > 0 && result[0].agent) {
@@ -619,26 +645,46 @@ export class AgentModel {
     // 4. Create the builtin agent with persist config.
     // Idempotent under concurrent callers: two parallel requests for the same
     // (userId, slug) both see no existing row and race to insert. Without
-    // `onConflictDoNothing`, the loser hits the `agents_slug_user_id_unique`
-    // constraint; with it, the loser's `.returning()` is empty and we re-read
-    // the row that won.
+    // `onConflictDoNothing`, the loser hits the slug-unique constraint; with
+    // it, the loser's `.returning()` is empty and we re-read the row that won.
+    //
+    // The conflict target is partitioned to match the two partial unique
+    // indexes (see `agents` schema): personal rows are unique by (slug, userId)
+    // and workspace rows are unique by (workspaceId, slug). The `where` clause
+    // is required so Postgres can infer the partial index as the arbiter
+    // (otherwise PG raises `42P10: no unique or exclusion constraint matching
+    // the ON CONFLICT specification`).
+    const conflictConfig = this.workspaceId
+      ? {
+          target: [agents.workspaceId, agents.slug],
+          where: sql`${agents.workspaceId} IS NOT NULL`,
+        }
+      : {
+          target: [agents.slug, agents.userId],
+          where: sql`${agents.workspaceId} IS NULL`,
+        };
+
     const result = await this.db
       .insert(agents)
-      .values({
-        model: persistConfig.model,
-        provider: persistConfig.provider,
-        slug: persistConfig.slug,
-        userId: this.userId,
-        virtual: true,
-      })
-      .onConflictDoNothing({ target: [agents.slug, agents.userId] })
+      .values(
+        buildWorkspacePayload(
+          { userId: this.userId, workspaceId: this.workspaceId },
+          {
+            model: persistConfig.model,
+            provider: persistConfig.provider,
+            slug: persistConfig.slug,
+            virtual: true,
+          },
+        ),
+      )
+      .onConflictDoNothing(conflictConfig)
       .returning();
 
     if (result[0]) return result[0];
 
     return (
       (await this.db.query.agents.findFirst({
-        where: and(eq(agents.slug, slug), eq(agents.userId, this.userId)),
+        where: and(eq(agents.slug, slug), this.ownership()),
       })) ?? null
     );
   };

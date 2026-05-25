@@ -1,5 +1,4 @@
 import type { BriefAction } from '@lobechat/types';
-import { isTrimmedNonEmptyString } from '@lobechat/utils';
 import { z } from 'zod';
 
 import type {
@@ -314,6 +313,8 @@ const getMergeableProposalSnapshotError = (action: SelfReviewProposalActionPlan)
 const isMergeableProposalAction = (actionType: string) =>
   actionType === 'create_skill' || actionType === 'refine_skill';
 
+const hasRequiredString = (value: unknown) => typeof value === 'string' && value.trim().length > 0;
+
 const hasCompleteMergeableSnapshot = (
   actionType: string,
   snapshot: SelfReviewProposalBaseSnapshot | undefined,
@@ -322,16 +323,16 @@ const hasCompleteMergeableSnapshot = (
 
   if (actionType === 'refine_skill') {
     return (
-      isTrimmedNonEmptyString(snapshot.agentDocumentId) &&
-      isTrimmedNonEmptyString(snapshot.documentId) &&
-      isTrimmedNonEmptyString(snapshot.contentHash) &&
+      hasRequiredString(snapshot.agentDocumentId) &&
+      hasRequiredString(snapshot.documentId) &&
+      hasRequiredString(snapshot.contentHash) &&
       snapshot.managed === true &&
       snapshot.writable === true
     );
   }
 
   if (actionType === 'create_skill') {
-    return snapshot.absent === true && isTrimmedNonEmptyString(snapshot.skillName);
+    return snapshot.absent === true && hasRequiredString(snapshot.skillName);
   }
 
   return false;

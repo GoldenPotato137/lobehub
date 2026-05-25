@@ -5,13 +5,18 @@ import { memo } from 'react';
 import { Link } from 'react-router-dom';
 
 import { DESKTOP_HEADER_ICON_SMALL_SIZE } from '@/const/layoutTokens';
+import { buildWorkspaceAwarePath } from '@/features/Workspace/workspaceAwarePath';
+import { useWorkspaceStore, workspaceSelectors } from '@/store/workspace';
 
 export const BACK_BUTTON_ID = 'lobe-back-button';
 
 const BackButton = memo<ActionIconProps & { to?: string }>(({ to = '/', onClick, ...rest }) => {
+  const activeSlug = useWorkspaceStore((s) => workspaceSelectors.activeWorkspace(s)?.slug ?? null);
+  const resolvedTo = buildWorkspaceAwarePath(to, activeSlug);
+
   return (
     // @ts-expect-error
-    <Link to={to} onClick={onClick}>
+    <Link to={resolvedTo} onClick={onClick}>
       <ActionIcon
         icon={ChevronLeftIcon}
         id={BACK_BUTTON_ID}

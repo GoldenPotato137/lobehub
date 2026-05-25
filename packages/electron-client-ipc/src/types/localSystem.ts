@@ -254,10 +254,7 @@ export interface KillCommandResult {
   success: boolean;
 }
 
-// Grep types — declared locally to keep this package leaf-only (no reverse
-// dependency on `@lobechat/local-file-shell`). The shape mirrors the
-// definition in `local-file-shell/types`; the two must stay in sync, but
-// they're structurally compatible by design.
+// Grep types
 export interface GrepContentParams {
   '-A'?: number;
   '-B'?: number;
@@ -267,14 +264,14 @@ export interface GrepContentParams {
   'glob'?: string;
   'head_limit'?: number;
   'multiline'?: boolean;
-  'output_mode'?: 'content' | 'count' | 'files_with_matches';
+  'output_mode'?: 'content' | 'files_with_matches' | 'count';
   /** Legacy alias for `scope`. Takes precedence when set; prefer `scope` (the manifest-documented name) for new callers. */
   'path'?: string;
   'pattern': string;
   /** Working directory scope. Limits the search to this directory. Defaults to `process.cwd()`. */
   'scope'?: string;
   /** Preferred search tool: 'rg' | 'ag' | 'grep' */
-  'tool'?: 'ag' | 'grep' | 'rg';
+  'tool'?: 'rg' | 'ag' | 'grep';
   'type'?: string;
 }
 
@@ -287,7 +284,7 @@ export interface GrepContentResult {
   total_matches: number;
 }
 
-// Glob types — same rationale as Grep above.
+// Glob types
 export interface GlobFilesParams {
   pattern: string;
   /** Working directory scope. When `pattern` is relative, it is joined with this scope. Defaults to the current working directory. */

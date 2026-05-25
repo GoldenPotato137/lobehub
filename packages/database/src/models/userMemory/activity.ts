@@ -6,20 +6,27 @@ import type { NewUserMemoryActivity, UserMemoryActivity } from '../../schemas';
 import { userMemories, userMemoriesActivities } from '../../schemas';
 import type { LobeChatDatabase } from '../../type';
 import { normalizeBm25MatchQuery, SAFE_BM25_QUERY_OPTIONS } from '../../utils/bm25';
+import { buildUserMemoryWhere } from '../../utils/workspace';
 
 export class UserMemoryActivityModel {
   private userId: string;
+  private workspaceId?: string;
   private db: LobeChatDatabase;
 
-  constructor(db: LobeChatDatabase, userId: string) {
+  constructor(db: LobeChatDatabase, userId: string, workspaceId?: string) {
     this.userId = userId;
+    this.workspaceId = workspaceId;
     this.db = db;
+  }
+
+  private memoryWhere(table: { userId: any; workspaceId: any }) {
+    return buildUserMemoryWhere({ userId: this.userId, workspaceId: this.workspaceId }, table);
   }
 
   create = async (params: Omit<NewUserMemoryActivity, 'userId'>) => {
     const [result] = await this.db
       .insert(userMemoriesActivities)
-      .values({ ...params, userId: this.userId })
+      .values({ ...params, userId: this.userId, workspaceId: this.workspaceId ?? null })
       .returning();
 
     return result;
@@ -28,10 +35,7 @@ export class UserMemoryActivityModel {
   delete = async (id: string) => {
     return this.db.transaction(async (tx) => {
       const activity = await tx.query.userMemoriesActivities.findFirst({
-        where: and(
-          eq(userMemoriesActivities.id, id),
-          eq(userMemoriesActivities.userId, this.userId),
-        ),
+        where: and(eq(userMemoriesActivities.id, id), this.memoryWhere(userMemoriesActivities)),
       });
 
       if (!activity || !activity.userMemoryId) {
@@ -40,25 +44,21 @@ export class UserMemoryActivityModel {
 
       await tx
         .delete(userMemories)
-        .where(
-          and(eq(userMemories.id, activity.userMemoryId), eq(userMemories.userId, this.userId)),
-        );
+        .where(and(eq(userMemories.id, activity.userMemoryId), this.memoryWhere(userMemories)));
 
       return { success: true };
     });
   };
 
   deleteAll = async () => {
-    return this.db
-      .delete(userMemoriesActivities)
-      .where(eq(userMemoriesActivities.userId, this.userId));
+    return this.db.delete(userMemoriesActivities).where(this.memoryWhere(userMemoriesActivities));
   };
 
   query = async (limit = 50) => {
     return this.db.query.userMemoriesActivities.findMany({
       limit,
       orderBy: [desc(userMemoriesActivities.createdAt)],
-      where: eq(userMemoriesActivities.userId, this.userId),
+      where: this.memoryWhere(userMemoriesActivities),
     });
   };
 
@@ -74,7 +74,7 @@ export class UserMemoryActivityModel {
       : '';
 
     const conditions: Array<SQL | undefined> = [
-      eq(userMemoriesActivities.userId, this.userId),
+      this.memoryWhere(userMemoriesActivities),
       normalizedQuery
         ? sql`(${userMemories.id} @@@ paradedb.boolean(should => ARRAY[paradedb.match('title', ${bm25MatchQuery}, conjunction_mode => true)]) OR ${userMemoriesActivities.id} @@@ paradedb.boolean(should => ARRAY[paradedb.match('narrative', ${bm25MatchQuery}, conjunction_mode => true), paradedb.match('notes', ${bm25MatchQuery}, conjunction_mode => true), paradedb.match('feedback', ${bm25MatchQuery}, conjunction_mode => true)]))`
         : undefined,
@@ -108,7 +108,7 @@ export class UserMemoryActivityModel {
 
     const joinCondition = and(
       eq(userMemories.id, userMemoriesActivities.userMemoryId),
-      eq(userMemories.userId, this.userId),
+      this.memoryWhere(userMemories),
     );
 
     const [rows, totalResult] = await Promise.all([
@@ -151,7 +151,7 @@ export class UserMemoryActivityModel {
 
   findById = async (id: string) => {
     return this.db.query.userMemoriesActivities.findFirst({
-      where: and(eq(userMemoriesActivities.id, id), eq(userMemoriesActivities.userId, this.userId)),
+      where: and(eq(userMemoriesActivities.id, id), this.memoryWhere(userMemoriesActivities)),
     });
   };
 
@@ -159,8 +159,6 @@ export class UserMemoryActivityModel {
     return this.db
       .update(userMemoriesActivities)
       .set({ ...value, updatedAt: new Date() })
-      .where(
-        and(eq(userMemoriesActivities.id, id), eq(userMemoriesActivities.userId, this.userId)),
-      );
+      .where(and(eq(userMemoriesActivities.id, id), this.memoryWhere(userMemoriesActivities)));
   };
 }

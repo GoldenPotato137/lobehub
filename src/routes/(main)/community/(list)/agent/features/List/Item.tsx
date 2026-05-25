@@ -4,10 +4,11 @@ import { ClockIcon } from 'lucide-react';
 import qs from 'query-string';
 import React, { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import urlJoin from 'url-join';
 
 import PublishedTime from '@/components/PublishedTime';
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
 import { useQuery } from '@/hooks/useQuery';
 import { discoverService } from '@/services/discover';
 import { type AssistantMarketSource, type DiscoverAssistantItem } from '@/types/discover';
@@ -71,7 +72,7 @@ const AssistantItem = memo<DiscoverAssistantItem>(
     userName,
     type,
   }) => {
-    const navigate = useNavigate();
+    const navigate = useWorkspaceAwareNavigate();
     const { source } = useQuery() as { source?: AssistantMarketSource };
     const isGroupAgent = type === 'agent-group';
     const basePath = isGroupAgent ? '/community/group_agent' : '/community/agent';

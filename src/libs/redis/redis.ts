@@ -15,9 +15,6 @@ import { buildIORedisSetArgs, normalizeMsetValues } from './utils';
 
 const log = debug('lobe:redis');
 
-const REDIS_CONNECT_TIMEOUT_MS = 10_000;
-const REDIS_COMMAND_TIMEOUT_MS = 10_000;
-
 export class IoRedisRedisProvider implements BaseRedisProvider {
   private client: Redis | null = null;
 
@@ -27,8 +24,6 @@ export class IoRedisRedisProvider implements BaseRedisProvider {
     const IORedis = await import('ioredis');
 
     this.client = new IORedis.default(this.config.url, {
-      commandTimeout: REDIS_COMMAND_TIMEOUT_MS,
-      connectTimeout: REDIS_CONNECT_TIMEOUT_MS,
       db: this.config.database,
       keyPrefix: this.config.prefix ? `${this.config.prefix}:` : undefined,
       lazyConnect: true,

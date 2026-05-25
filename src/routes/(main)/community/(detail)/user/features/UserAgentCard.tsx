@@ -29,10 +29,12 @@ import {
 import qs from 'query-string';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import urlJoin from 'url-join';
 
 import PublishedTime from '@/components/PublishedTime';
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
+import { usePermission } from '@/hooks/usePermission';
 import { agentService } from '@/services/agent';
 import { discoverService } from '@/services/discover';
 import { useAgentStore } from '@/store/agent';
@@ -134,9 +136,11 @@ const UserAgentCard = memo<UserAgentCardProps>(
     isValidated,
   }) => {
     const { t } = useTranslation(['discover', 'setting']);
-    const navigate = useNavigate();
+    const navigate = useWorkspaceAwareNavigate();
     const { message } = App.useApp();
     const { isOwner, onStatusChange } = useUserDetailContext();
+    const { allowed: canCreate } = usePermission('create_content');
+    const { allowed: canEdit } = usePermission('edit_own_content');
 
     const [, setIsEditLoading] = useState(false);
     const createAgent = useAgentStore((s) => s.createAgent);
@@ -157,6 +161,7 @@ const UserAgentCard = memo<UserAgentCardProps>(
     }, [identifier]);
 
     const handleEdit = useCallback(async () => {
+      if (!canEdit || !canCreate) return;
       setIsEditLoading(true);
       try {
         // First, try to find the local agent by market identifier
@@ -203,13 +208,14 @@ const UserAgentCard = memo<UserAgentCardProps>(
       } finally {
         setIsEditLoading(false);
       }
-    }, [identifier, navigate, createAgent, refreshAgentList, message, t]);
+    }, [canCreate, canEdit, identifier, navigate, createAgent, refreshAgentList, message, t]);
 
     const handleStatusAction = useCallback(
       (action: 'publish' | 'unpublish' | 'deprecate') => {
+        if (!canEdit) return;
         onStatusChange?.(identifier, action);
       },
-      [identifier, onStatusChange],
+      [canEdit, identifier, onStatusChange],
     );
 
     const menuItems = isOwner
@@ -221,6 +227,7 @@ const UserAgentCard = memo<UserAgentCardProps>(
             onClick: handleViewDetail,
           },
           {
+            disabled: !canEdit || !canCreate,
             icon: <Icon icon={Pencil} />,
             key: 'edit',
             label: t('setting:myAgents.actions.edit'),
@@ -230,6 +237,7 @@ const UserAgentCard = memo<UserAgentCardProps>(
             type: 'divider' as const,
           },
           {
+            disabled: !canEdit,
             icon: <Icon icon={isPublished ? EyeOff : Eye} />,
             key: 'togglePublish',
             label: isPublished
@@ -239,6 +247,7 @@ const UserAgentCard = memo<UserAgentCardProps>(
           },
           {
             danger: true,
+            disabled: !canEdit,
             icon: <Icon icon={AlertTriangle} />,
             key: 'deprecate',
             label: t('setting:myAgents.actions.deprecate'),

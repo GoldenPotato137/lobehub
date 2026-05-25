@@ -1,56 +1,15 @@
-import type { FollowUpChip, FollowUpHint, FollowUpModelConfig } from '@lobechat/types';
+import type { FollowUpChip, FollowUpHint } from '@lobechat/types';
 
 import { followUpActionService } from '@/services/followUpAction';
 import { type StoreSetter } from '@/store/types';
 
-import { type FollowUpActionSlot } from './initialState';
 import { type FollowUpActionStore } from './store';
 
 // LLM `generateObject` for chip extraction routinely takes 8-12s end-to-end.
 // Anything below ~20s aborts before the model can respond.
 const TIMEOUT_MS = 20_000;
 
-const IDLE_SLOT: FollowUpActionSlot = { chips: [], status: 'idle' };
-
 type Setter = StoreSetter<FollowUpActionStore>;
-
-interface FetchForParams {
-  hint?: FollowUpHint;
-  modelConfig: FollowUpModelConfig;
-  threadId?: string;
-  topicId: string;
-}
-
-const writeSlot = (
-  set: Setter,
-  conversationKey: string,
-  slot: FollowUpActionSlot,
-  action: string,
-): void => {
-  set(
-    (state) => ({
-      slots: {
-        ...state.slots,
-        [conversationKey]: slot,
-      },
-    }),
-    false,
-    action,
-  );
-};
-
-const removeSlot = (set: Setter, conversationKey: string, action: string): void => {
-  set(
-    (state) => {
-      if (!state.slots[conversationKey]) return state;
-
-      const { [conversationKey]: _, ...rest } = state.slots;
-      return { slots: rest };
-    },
-    false,
-    action,
-  );
-};
 
 export const createFollowUpActionSlice = (
   set: Setter,
@@ -68,76 +27,94 @@ export class FollowUpActionImpl {
     this.#get = get;
   }
 
-  fetchFor = async (conversationKey: string, params: FetchForParams): Promise<void> => {
-    const existing = this.#get().slots[conversationKey];
-    if (existing?.status === 'loading') return;
+  fetchFor = async (topicId: string, hint?: FollowUpHint): Promise<void> => {
+    const cur = this.#get();
+    // Dedupe: skip if already loading/ready for the same topic
+    if (cur.pendingTopicId === topicId && cur.status !== 'idle') return;
 
-    existing?.abortController?.abort();
+    cur.abortController?.abort();
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-    writeSlot(
-      this.#set,
-      conversationKey,
+    this.#set(
       {
         abortController: controller,
         chips: [],
+        messageId: undefined,
+        pendingTopicId: topicId,
         status: 'loading',
+        topicId: undefined,
       },
+      false,
       'fetchFor:start',
     );
 
-    const result = await followUpActionService.extract(
-      {
-        hint: params.hint,
-        modelConfig: params.modelConfig,
-        threadId: params.threadId,
-        topicId: params.topicId,
-      },
-      controller.signal,
-    );
+    const result = await followUpActionService.extract({ hint, topicId }, controller.signal);
     clearTimeout(timeoutId);
 
-    // Identity guard: a same-key follow-up turn (next assistant settle) would
-    // otherwise let an in-flight prior result overwrite the new turn's chips
-    // when the network abort race is lost.
-    if (this.#get().slots[conversationKey]?.abortController !== controller) return;
+    // Discard stale results: if the active controller in state is no longer
+    // this one, our call has been superseded — either by clear()/abort()
+    // (e.g., user sent a new message) or by a newer fetchFor for the same
+    // topic (next turn). Identity beats topicId here because a same-topic
+    // follow-up turn would otherwise let an in-flight prior result overwrite
+    // the new turn's chips when the network abort race is lost.
+    if (this.#get().abortController !== controller) return;
 
     if (!result || !result.messageId || result.chips.length === 0) {
-      writeSlot(this.#set, conversationKey, { ...IDLE_SLOT }, 'fetchFor:fail');
+      this.#set(
+        {
+          abortController: undefined,
+          chips: [],
+          messageId: undefined,
+          pendingTopicId: undefined,
+          status: 'idle',
+          topicId: undefined,
+        },
+        false,
+        'fetchFor:fail',
+      );
       return;
     }
 
-    writeSlot(
-      this.#set,
-      conversationKey,
+    this.#set(
       {
+        abortController: undefined,
         chips: result.chips,
         messageId: result.messageId,
+        pendingTopicId: undefined,
         status: 'ready',
+        topicId,
       },
+      false,
       'fetchFor:ready',
     );
   };
 
-  abort = (conversationKey: string): void => {
-    const slot = this.#get().slots[conversationKey];
-    if (!slot) return;
-    slot.abortController?.abort();
-    writeSlot(this.#set, conversationKey, { ...IDLE_SLOT }, 'abort');
+  abort = (): void => {
+    const cur = this.#get();
+    cur.abortController?.abort();
+    this.#set(
+      {
+        abortController: undefined,
+        chips: [],
+        messageId: undefined,
+        pendingTopicId: undefined,
+        status: 'idle',
+        topicId: undefined,
+      },
+      false,
+      'abort',
+    );
   };
 
-  clear = (conversationKey: string): void => {
-    const slot = this.#get().slots[conversationKey];
-    if (!slot) return;
-    slot.abortController?.abort();
-    removeSlot(this.#set, conversationKey, 'clear');
+  clear = (): void => {
+    this.abort();
   };
 
-  consume = (conversationKey: string, chip: FollowUpChip): void => {
+  consume = (chip: FollowUpChip): void => {
     void chip;
-    this.clear(conversationKey);
+    this.clear();
   };
 }
 

@@ -18,6 +18,8 @@ export {
   CredsApiName,
   type CredsApiNameType,
   type CredSummaryForContext,
+  type GetPlaintextCredParams,
+  type GetPlaintextCredState,
   type InitiateOAuthConnectParams,
   type InjectCredsToSandboxParams,
   type InjectCredsToSandboxState,

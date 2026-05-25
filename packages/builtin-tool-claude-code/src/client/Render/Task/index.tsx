@@ -230,50 +230,34 @@ const Task = memo<BuiltinRenderProps<TaskUpdateArgs | undefined, TaskPluginState
     }, [items]);
 
     const override = useMemo<TaskHeaderOverride | undefined>(() => {
-      if (apiName !== ClaudeCodeApiName.TaskUpdate) return undefined;
-      const status = args?.status;
-      const taskId = args?.taskId;
-      const argsSubject = args?.subject;
+      if (apiName !== ClaudeCodeApiName.TaskUpdate || !args?.status) return undefined;
+      const { status, taskId, subject: argsSubject } = args;
       const resolvedSubject =
-        argsSubject ?? (taskId ? items?.find((item) => item.id === taskId)?.text : undefined);
-      if (status) {
-        const map = {
-          completed: {
-            color: cssVar.colorSuccess,
-            icon: CircleCheckBig,
-            label: t('builtins.lobe-claude-code.task.updateCompleted'),
-          },
-          deleted: {
-            color: cssVar.colorError,
-            icon: CircleX,
-            label: t('builtins.lobe-claude-code.task.updateDeleted'),
-          },
-          in_progress: {
-            color: cssVar.colorInfo,
-            icon: CircleArrowRight,
-            label: t('builtins.lobe-claude-code.task.updateInProgress'),
-          },
-          pending: {
-            color: cssVar.colorTextSecondary,
-            icon: RotateCcw,
-            label: t('builtins.lobe-claude-code.task.updatePending'),
-          },
-        } as const;
-        const entry = map[status];
-        return { ...entry, detail: resolvedSubject };
-      }
-      // Subject-only edit: surface the new subject as the header detail so a
-      // collapsed panel still reads "Task updated: <subject>" instead of the
-      // generic todo aggregate.
-      if (argsSubject) {
-        return {
+        (taskId ? items?.find((item) => item.id === taskId)?.text : undefined) ?? argsSubject;
+      const map = {
+        completed: {
+          color: cssVar.colorSuccess,
+          icon: CircleCheckBig,
+          label: t('builtins.lobe-claude-code.task.updateCompleted'),
+        },
+        deleted: {
+          color: cssVar.colorError,
+          icon: CircleX,
+          label: t('builtins.lobe-claude-code.task.updateDeleted'),
+        },
+        in_progress: {
+          color: cssVar.colorInfo,
+          icon: CircleArrowRight,
+          label: t('builtins.lobe-claude-code.task.updateInProgress'),
+        },
+        pending: {
           color: cssVar.colorTextSecondary,
-          detail: resolvedSubject,
-          icon: ListTodo,
-          label: t('builtins.lobe-claude-code.task.updateSubject.completed'),
-        };
-      }
-      return undefined;
+          icon: RotateCcw,
+          label: t('builtins.lobe-claude-code.task.updatePending'),
+        },
+      } as const;
+      const entry = map[status];
+      return { ...entry, detail: resolvedSubject };
     }, [apiName, args, items, t]);
 
     if (!items || items.length === 0) return null;

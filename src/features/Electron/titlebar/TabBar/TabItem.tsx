@@ -13,9 +13,9 @@ import { X } from 'lucide-react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { type ResolvedPageData } from '@/features/Electron/titlebar/RecentlyViewed/types';
 import { electronStylish } from '@/styles/electron';
 
-import { type ResolvedTab } from './hooks/useResolvedTabs';
 import { useTabRunning } from './hooks/useTabRunning';
 import { useTabUnread } from './hooks/useTabUnread';
 import { useStyles } from './styles';
@@ -23,7 +23,7 @@ import { useStyles } from './styles';
 interface TabItemProps {
   index: number;
   isActive: boolean;
-  item: ResolvedTab;
+  item: ResolvedPageData;
   onActivate: (id: string, url: string) => void;
   onClose: (id: string) => void;
   onCloseLeft: (id: string) => void;
@@ -46,17 +46,16 @@ const TabItem = memo<TabItemProps>(
   }) => {
     const styles = useStyles;
     const { t } = useTranslation('electron');
-    const id = item.tab.id;
-    const { meta, tab } = item;
-    const isRunning = useTabRunning(tab);
-    const isUnread = useTabUnread(tab);
+    const id = item.reference.id;
+    const isRunning = useTabRunning(item.reference);
+    const isUnread = useTabUnread(item.reference);
     const showUnreadDot = !isRunning && isUnread;
 
     const handleClick = useCallback(() => {
       if (!isActive) {
-        onActivate(id, tab.url);
+        onActivate(id, item.url);
       }
-    }, [isActive, onActivate, id, tab.url]);
+    }, [isActive, onActivate, id, item.url]);
 
     const handleClose = useCallback(
       (e: React.MouseEvent) => {
@@ -105,12 +104,12 @@ const TabItem = memo<TabItemProps>(
           gap={6}
           onClick={handleClick}
         >
-          {meta.avatar ? (
+          {item.avatar ? (
             <span className={styles.avatarWrapper}>
               <Avatar
                 emojiScaleWithBackground
-                avatar={meta.avatar}
-                background={meta.backgroundColor}
+                avatar={item.avatar}
+                background={item.backgroundColor}
                 shape="square"
                 size={16}
               />
@@ -118,9 +117,9 @@ const TabItem = memo<TabItemProps>(
               {showUnreadDot && <span aria-label={t('tab.unread')} className={styles.unreadDot} />}
             </span>
           ) : (
-            meta.icon && (
+            item.icon && (
               <span className={styles.avatarWrapper}>
-                <Icon className={styles.tabIcon} icon={meta.icon} size="small" />
+                <Icon className={styles.tabIcon} icon={item.icon} size="small" />
                 {isRunning && <span aria-label={t('tab.running')} className={styles.runningDot} />}
                 {showUnreadDot && (
                   <span aria-label={t('tab.unread')} className={styles.unreadDot} />
@@ -128,7 +127,7 @@ const TabItem = memo<TabItemProps>(
               </span>
             )
           )}
-          <span className={styles.tabTitle}>{meta.title}</span>
+          <span className={styles.tabTitle}>{item.title}</span>
           <ActionIcon className={styles.closeIcon} icon={X} size="small" onClick={handleClose} />
         </Flexbox>
       </ContextMenuTrigger>

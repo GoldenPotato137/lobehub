@@ -325,7 +325,7 @@ export const GroupAgentBuilderManifest: BuiltinToolManifest = {
             properties: {
               chatConfig: {
                 description:
-                  'Chat configuration settings (historyCount, enableHistoryCount, enableCompressHistory, etc.)',
+                  'Chat configuration settings (historyCount, enableHistoryCount, enableAutoCreateTopic, etc.)',
                 type: 'object',
               },
               model: {

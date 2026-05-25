@@ -3,6 +3,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import type { DocumentItem, NewTopicDocument } from '../schemas';
 import { documents, topicDocuments } from '../schemas';
 import type { LobeChatDatabase } from '../type';
+import { buildWorkspaceWhere } from '../utils/workspace';
 
 export interface TopicDocumentWithDetails extends DocumentItem {
   associatedAt: Date;
@@ -11,29 +12,29 @@ export interface TopicDocumentWithDetails extends DocumentItem {
 export class TopicDocumentModel {
   private userId: string;
   private db: LobeChatDatabase;
+  private workspaceId?: string;
 
-  constructor(db: LobeChatDatabase, userId: string) {
+  constructor(db: LobeChatDatabase, userId: string, workspaceId?: string) {
     this.userId = userId;
     this.db = db;
+    this.workspaceId = workspaceId;
   }
 
+  private ownership = () =>
+    buildWorkspaceWhere({ userId: this.userId, workspaceId: this.workspaceId }, topicDocuments);
+
   /**
-   * Associate a document with a topic.
-   *
-   * Idempotent: the primary key is `(documentId, topicId)`, so re-binding the
-   * same pair is a no-op via `ON CONFLICT DO NOTHING` instead of a
-   * unique-violation. Callers can safely retry or call this on every save
-   * without checking existence first.
+   * Associate a document with a topic
    */
   associate = async (
     params: Omit<NewTopicDocument, 'userId'>,
   ): Promise<{ documentId: string; topicId: string }> => {
-    await this.db
+    const [result] = await this.db
       .insert(topicDocuments)
-      .values({ ...params, userId: this.userId })
-      .onConflictDoNothing();
+      .values({ ...params, userId: this.userId, workspaceId: this.workspaceId ?? null })
+      .returning();
 
-    return { documentId: params.documentId, topicId: params.topicId };
+    return { documentId: result.documentId, topicId: result.topicId };
   };
 
   /**
@@ -46,7 +47,7 @@ export class TopicDocumentModel {
         and(
           eq(topicDocuments.documentId, documentId),
           eq(topicDocuments.topicId, topicId),
-          eq(topicDocuments.userId, this.userId),
+          this.ownership(),
         ),
       );
   };
@@ -68,7 +69,7 @@ export class TopicDocumentModel {
       .where(
         and(
           eq(topicDocuments.topicId, topicId),
-          eq(topicDocuments.userId, this.userId),
+          this.ownership(),
           filter?.type ? eq(documents.fileType, filter.type) : undefined,
         ),
       )
@@ -87,9 +88,7 @@ export class TopicDocumentModel {
     const results = await this.db
       .select({ topicId: topicDocuments.topicId })
       .from(topicDocuments)
-      .where(
-        and(eq(topicDocuments.documentId, documentId), eq(topicDocuments.userId, this.userId)),
-      );
+      .where(and(eq(topicDocuments.documentId, documentId), this.ownership()));
 
     return results.map((r) => r.topicId);
   };
@@ -102,7 +101,7 @@ export class TopicDocumentModel {
       where: and(
         eq(topicDocuments.documentId, documentId),
         eq(topicDocuments.topicId, topicId),
-        eq(topicDocuments.userId, this.userId),
+        this.ownership(),
       ),
     });
 
@@ -115,7 +114,7 @@ export class TopicDocumentModel {
   deleteByTopicId = async (topicId: string) => {
     return this.db
       .delete(topicDocuments)
-      .where(and(eq(topicDocuments.topicId, topicId), eq(topicDocuments.userId, this.userId)));
+      .where(and(eq(topicDocuments.topicId, topicId), this.ownership()));
   };
 
   /**
@@ -124,8 +123,6 @@ export class TopicDocumentModel {
   deleteByDocumentId = async (documentId: string) => {
     return this.db
       .delete(topicDocuments)
-      .where(
-        and(eq(topicDocuments.documentId, documentId), eq(topicDocuments.userId, this.userId)),
-      );
+      .where(and(eq(topicDocuments.documentId, documentId), this.ownership()));
   };
 }

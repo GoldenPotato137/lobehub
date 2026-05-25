@@ -15,8 +15,8 @@ import {
 } from 'lucide-react';
 import { Fragment, memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
 
+import WorkspaceLink from '@/features/Workspace/WorkspaceLink';
 import { useEvalStore } from '@/store/eval';
 
 import StatusBadge from '../../../../features/StatusBadge';
@@ -239,7 +239,7 @@ const RunCard = memo<RunCardProps>(({ benchmarkId, run, onRefresh, onEdit }) => 
   ];
 
   return (
-    <Link className={styles.cardLink} to={`/eval/bench/${benchmarkId}/runs/${run.id}`}>
+    <WorkspaceLink className={styles.cardLink} to={`/eval/bench/${benchmarkId}/runs/${run.id}`}>
       <Card className={styles.card}>
         <Flexbox horizontal align="center" gap={16}>
           {/* Left: Info */}
@@ -333,7 +333,7 @@ const RunCard = memo<RunCardProps>(({ benchmarkId, run, onRefresh, onEdit }) => 
           <Icon className={styles.arrowIcon} icon={ArrowRight} size={16} />
         </Flexbox>
       </Card>
-    </Link>
+    </WorkspaceLink>
   );
 });
 

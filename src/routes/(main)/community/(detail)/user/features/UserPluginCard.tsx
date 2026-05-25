@@ -4,9 +4,10 @@ import { Avatar, Block, Flexbox, Text } from '@lobehub/ui';
 import { createStaticStyles } from 'antd-style';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import urlJoin from 'url-join';
 
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
 import { type DiscoverPluginItem } from '@/types/discover';
 
 const styles = createStaticStyles(({ css, cssVar }) => {
@@ -45,7 +46,7 @@ type UserPluginCardProps = DiscoverPluginItem;
 const UserPluginCard = memo<UserPluginCardProps>(
   ({ title, avatar, author, description, identifier, category }) => {
     const { t } = useTranslation('discover');
-    const navigate = useNavigate();
+    const navigate = useWorkspaceAwareNavigate();
     const link = urlJoin('/community/plugin', identifier);
 
     const handleClick = useCallback(() => {

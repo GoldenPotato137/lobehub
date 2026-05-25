@@ -47,10 +47,10 @@ export class AgentService {
   private readonly agentModel: AgentModel;
   private readonly userModel: UserModel;
 
-  constructor(db: LobeChatDatabase, userId: string) {
+  constructor(db: LobeChatDatabase, userId: string, workspaceId?: string) {
     this.userId = userId;
     this.db = db;
-    this.agentModel = new AgentModel(db, userId);
+    this.agentModel = new AgentModel(db, userId, workspaceId);
     this.userModel = new UserModel(db, userId);
   }
 

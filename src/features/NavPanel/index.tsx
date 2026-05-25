@@ -1,9 +1,13 @@
 'use client';
 
 import { type PropsWithChildren, type ReactNode } from 'react';
-import { memo, useLayoutEffect, useSyncExternalStore } from 'react';
+import { memo, useLayoutEffect, useRef, useSyncExternalStore } from 'react';
+import { useLocation } from 'react-router-dom';
 
-import Sidebar from '@/routes/(main)/home/_layout/Sidebar';
+import WorkspaceSettingsSideBarContent from '@/features/WorkspaceSetting/SideBar/Content';
+import SidebarContent from '@/routes/(main)/home/_layout/SidebarContent';
+import SettingsSidebarContent from '@/routes/(main)/settings/_layout/SidebarContent';
+import { useWorkspaceStore, workspaceSelectors } from '@/store/workspace';
 
 import { NavPanelDraggable } from './components/NavPanelDraggable';
 
@@ -28,13 +32,9 @@ const setNavPanelSnapshot = (snapshot: NavPanelSnapshot) => {
   listeners.forEach((listener) => listener());
 };
 
-export const resetNavPanel = () => {
-  if (!currentSnapshot) return;
-
-  setNavPanelSnapshot(null);
-};
-
 const FALLBACK_NAV_KEY = 'home';
+const SETTINGS_NAV_KEY = 'settings';
+const WORKSPACE_SETTINGS_NAV_KEY = 'workspace-settings';
 
 const getActiveNavKey = () => currentSnapshot?.key ?? FALLBACK_NAV_KEY;
 
@@ -42,14 +42,44 @@ export const useActiveNavKey = () =>
   useSyncExternalStore(subscribeNavPanel, getActiveNavKey, getActiveNavKey);
 
 const NavPanel = memo(() => {
+  const { pathname } = useLocation();
+  const activeSlug = useWorkspaceStore((s) => workspaceSelectors.activeWorkspace(s)?.slug ?? null);
   const panelContent = useSyncExternalStore(
     subscribeNavPanel,
     getNavPanelSnapshot,
     getNavPanelSnapshot,
   );
 
-  // Use home Content as fallback when no portal content is provided
-  const activeContent = panelContent || { key: FALLBACK_NAV_KEY, node: <Sidebar /> };
+  const isWorkspaceSettingsRoute =
+    !!activeSlug &&
+    (pathname === `/${activeSlug}/settings` || pathname.startsWith(`/${activeSlug}/settings/`));
+  const isPersonalSettingsRoute = pathname === '/settings' || pathname.startsWith('/settings/');
+
+  const workspaceSettingsFallback = isWorkspaceSettingsRoute
+    ? {
+        key: WORKSPACE_SETTINGS_NAV_KEY,
+        node: <WorkspaceSettingsSideBarContent />,
+      }
+    : null;
+  const personalSettingsFallback = isPersonalSettingsRoute
+    ? {
+        key: SETTINGS_NAV_KEY,
+        node: <SettingsSidebarContent />,
+      }
+    : null;
+  const routeFallback = workspaceSettingsFallback || personalSettingsFallback;
+
+  const resolvedPanelContent =
+    routeFallback && panelContent?.key === FALLBACK_NAV_KEY ? routeFallback : panelContent;
+
+  // Fallback renders the home sidebar's content directly — using `<Sidebar />`
+  // (the portal wrapper) here loops with the portal's unmount cleanup:
+  // mount fallback → portal sets snapshot → fallback unmounts → cleanup
+  // clears snapshot → mount fallback → …
+  const activeContent =
+    resolvedPanelContent ||
+    routeFallback ||
+    ({ key: FALLBACK_NAV_KEY, node: <SidebarContent /> } satisfies NavPanelSnapshot);
 
   return (
     <>
@@ -78,6 +108,9 @@ interface NavPanelPortalProps extends PropsWithChildren {
 }
 
 export const NavPanelPortal = memo<NavPanelPortalProps>(({ children, navKey = 'default' }) => {
+  const navKeyRef = useRef(navKey);
+  navKeyRef.current = navKey;
+
   useLayoutEffect(() => {
     if (!children) return;
 
@@ -85,8 +118,22 @@ export const NavPanelPortal = memo<NavPanelPortalProps>(({ children, navKey = 'd
       key: navKey,
       node: children,
     });
-    // Intentionally keep previous content until new one mounts.
   }, [children, navKey]);
+
+  // Clear the snapshot on unmount if this portal still owns it. Without this,
+  // a route transition where the next layout's portal effect doesn't fire in
+  // the same commit (concurrent transitions, lazy boundaries, Fragment-key
+  // remounts) leaves the previous owner's snapshot in place — visible as a
+  // stale sidebar that may render empty under its new state (e.g. workspace
+  // settings sidebar after the active workspace is deleted).
+  useLayoutEffect(
+    () => () => {
+      if (currentSnapshot?.key === navKeyRef.current) {
+        setNavPanelSnapshot(null);
+      }
+    },
+    [],
+  );
 
   return null;
 });

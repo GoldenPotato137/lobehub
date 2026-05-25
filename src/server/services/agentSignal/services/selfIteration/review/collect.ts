@@ -1,6 +1,5 @@
 import { SpanStatusCode } from '@lobechat/observability-otel/api';
 import { tracer } from '@lobechat/observability-otel/modules/agent-signal';
-import { pickString, toRecord } from '@lobechat/utils';
 
 import type { AgentSignalDocumentActivityRow } from '@/database/models/agentSignal/reviewContext';
 
@@ -792,6 +791,13 @@ const createEmptyProposalActivity = (): ProposalActivityDigest => ({
   supersededCount: 0,
 });
 
+const toRecord = (value: unknown): Record<string, unknown> | undefined =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+
+const toString = (value: unknown) => (typeof value === 'string' ? value : undefined);
+
 const toStringArray = (value: unknown) =>
   Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 
@@ -800,8 +806,8 @@ const toEvidenceRefs = (value: unknown, fallbackReceiptId: string): EvidenceRef[
 
   const refs = value.flatMap((item): EvidenceRef[] => {
     const record = toRecord(item);
-    const id = pickString(record?.id);
-    const type = pickString(record?.type);
+    const id = toString(record?.id);
+    const type = toString(record?.type);
 
     if (!id) return [];
 
@@ -830,10 +836,10 @@ const toIntentTarget = (value: unknown): SelfFeedbackIntent['target'] | undefine
   if (!record) return;
 
   return {
-    memoryId: pickString(record.memoryId),
+    memoryId: toString(record.memoryId),
     readonly: typeof record.readonly === 'boolean' ? record.readonly : undefined,
-    skillDocumentId: pickString(record.skillDocumentId),
-    skillName: pickString(record.skillName),
+    skillDocumentId: toString(record.skillDocumentId),
+    skillName: toString(record.skillName),
     taskIds: toStringArray(record.taskIds),
     topicIds: toStringArray(record.topicIds),
   };
@@ -856,11 +862,11 @@ const toReflectionIntent = (
   if (!record || record.mode !== 'reflection') return;
 
   const intentType = isIntentType(record.intentType) ? record.intentType : undefined;
-  const rationale = pickString(record.rationale);
+  const rationale = toString(record.rationale);
   if (!intentType || !rationale) return;
 
   return normalizeReflectionIntent({
-    actionType: pickString(record.actionType),
+    actionType: toString(record.actionType),
     confidence: typeof record.confidence === 'number' ? record.confidence : undefined,
     downgradeReason:
       record.downgradeReason === 'approval_required' ||
@@ -869,14 +875,14 @@ const toReflectionIntent = (
         ? record.downgradeReason
         : undefined,
     evidenceRefs: toEvidenceRefs(record.evidenceRefs, receipt.id),
-    idempotencyKey: pickString(record.idempotencyKey) ?? receipt.id,
+    idempotencyKey: toString(record.idempotencyKey) ?? receipt.id,
     intentType,
     mode: 'reflection',
     operation: toRecord(record.operation) as SelfFeedbackIntent['operation'],
     rationale,
     risk: isRisk(record.risk) ? record.risk : 'medium',
     target: toIntentTarget(record.target),
-    title: pickString(record.title),
+    title: toString(record.title),
     urgency: isUrgency(record.urgency) ? record.urgency : 'later',
   });
 };

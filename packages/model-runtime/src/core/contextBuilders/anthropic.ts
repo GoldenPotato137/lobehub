@@ -1,5 +1,5 @@
 import type Anthropic from '@anthropic-ai/sdk';
-import { imageUrlToBase64, resolveImageMimeTypeFromBase64 } from '@lobechat/utils';
+import { imageUrlToBase64 } from '@lobechat/utils';
 import type OpenAI from 'openai';
 
 import type { OpenAIChatMessage, UserMessageContentPart } from '../../types';
@@ -13,8 +13,10 @@ const ANTHROPIC_SUPPORTED_IMAGE_TYPES = new Set([
   'image/webp',
 ]);
 
-const isImageTypeSupported = (mimeType: string | null | undefined): mimeType is string =>
-  !!mimeType && ANTHROPIC_SUPPORTED_IMAGE_TYPES.has(mimeType.toLowerCase());
+const isImageTypeSupported = (mimeType: string | null): boolean => {
+  if (!mimeType) return true;
+  return ANTHROPIC_SUPPORTED_IMAGE_TYPES.has(mimeType.toLowerCase());
+};
 
 /**
  * Check if a text value contains visible (non-whitespace) characters.
@@ -41,14 +43,12 @@ export const buildAnthropicBlock = async (
       const { mimeType, base64, type } = parseDataUri(content.image_url.url);
 
       if (type === 'base64') {
-        const resolvedMimeType = await resolveImageMimeTypeFromBase64(mimeType, base64);
-
-        if (!isImageTypeSupported(resolvedMimeType)) return undefined;
+        if (!isImageTypeSupported(mimeType)) return undefined;
 
         return {
           source: {
             data: base64 as string,
-            media_type: resolvedMimeType as Anthropic.Base64ImageSource['media_type'],
+            media_type: mimeType as Anthropic.Base64ImageSource['media_type'],
             type: 'base64',
           },
           type: 'image',

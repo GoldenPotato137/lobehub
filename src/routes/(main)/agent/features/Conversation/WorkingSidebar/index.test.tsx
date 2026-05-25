@@ -143,16 +143,10 @@ vi.mock('react-i18next', () => ({
         ({
           'workingPanel.resources.empty': 'No agent documents yet',
           'workingPanel.review.title': 'Review',
-          'workingPanel.skills.empty': 'No skills found',
           'workingPanel.space': 'Space',
         }) as Record<string, string>
       )[key] || key,
   }),
-}));
-
-vi.mock('react-router-dom', () => ({
-  useMatch: () => null,
-  useNavigate: () => vi.fn(),
 }));
 
 vi.mock('@/store/agent', () => ({
@@ -231,8 +225,7 @@ describe('AgentWorkingSidebar', () => {
     expect(screen.getAllByText('Space').length).toBeGreaterThan(0);
 
     const resources = screen.getByTestId('workspace-resources');
-    // Default tab is Skills; empty data shows the skills empty state.
-    expect(resources).toHaveTextContent('No skills found');
+    expect(resources).toHaveTextContent('No agent documents yet');
   });
 
   it('mounts a right panel wrapper', () => {

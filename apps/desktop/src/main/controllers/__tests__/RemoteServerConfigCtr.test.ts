@@ -535,7 +535,6 @@ describe('RemoteServerConfigCtr', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('Token refresh failed');
-      expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
     it('should handle missing tokens in response', async () => {
@@ -619,7 +618,7 @@ describe('RemoteServerConfigCtr', () => {
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
-    it('should not retry after a network error', async () => {
+    it('should handle network errors with retry', async () => {
       const { safeStorage } = await import('electron');
       vi.mocked(safeStorage.isEncryptionAvailable).mockReturnValue(true);
       vi.mocked(safeStorage.decryptString).mockImplementation((buffer: Buffer) =>
@@ -645,8 +644,9 @@ describe('RemoteServerConfigCtr', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('Network error');
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-    });
+      // With retry mechanism, fetch should be called 4 times (1 initial + 3 retries)
+      expect(mockFetch).toHaveBeenCalledTimes(4);
+    }, 15000);
   });
 
   describe('afterAppReady', () => {

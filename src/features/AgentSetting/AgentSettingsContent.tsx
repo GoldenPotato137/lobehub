@@ -6,6 +6,8 @@ import { agentSelectors } from '@/store/agent/selectors';
 import { ChatSettingsTabs } from '@/store/global/initialState';
 import { featureFlagsSelectors, useServerConfigStore } from '@/store/serverConfig';
 
+import AgentChat from './AgentChat';
+import AgentModal from './AgentModal';
 import AgentOpening from './AgentOpening';
 import AgentSelfIteration from './AgentSelfIteration';
 
@@ -23,6 +25,8 @@ const AgentSettingsContent = memo<AgentSettingsContentProps>(({ tab, loadingSkel
   return (
     <>
       {tab === ChatSettingsTabs.Opening && <AgentOpening />}
+      {tab === ChatSettingsTabs.Chat && <AgentChat />}
+      {tab === ChatSettingsTabs.Modal && <AgentModal />}
       {enableAgentSelfIteration && tab === ChatSettingsTabs.SelfIteration && <AgentSelfIteration />}
     </>
   );

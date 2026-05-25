@@ -1,7 +1,7 @@
 'use client';
 
 import { type KlavisServerType } from '@lobechat/const';
-import { Avatar, Button as LobeButton, DropdownMenu, Flexbox, Icon } from '@lobehub/ui';
+import { Avatar, Button as LobeButton, DropdownMenu, Flexbox, Icon, Tooltip } from '@lobehub/ui';
 import { App, Button } from 'antd';
 import { cssVar } from 'antd-style';
 import { Loader2, MoreHorizontalIcon, SquareArrowOutUpRight, Unplug } from 'lucide-react';
@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 
 import SkillSourceTag from '@/components/SkillSourceTag';
 import { createKlavisSkillDetailModal } from '@/features/SkillStore/SkillDetail';
+import { usePermission } from '@/hooks/usePermission';
 import { useToolStore } from '@/store/tool';
 import { type KlavisServer } from '@/store/tool/slices/klavisStore';
 import { KlavisServerStatus } from '@/store/tool/slices/klavisStore';
@@ -29,6 +30,8 @@ interface KlavisSkillItemProps {
 const KlavisSkillItem = memo<KlavisSkillItemProps>(({ serverType, server }) => {
   const { t } = useTranslation('setting');
   const { modal } = App.useApp();
+  const { allowed: canCreate, reason: createReason } = usePermission('create_content');
+  const { allowed: canEdit, reason: editReason } = usePermission('edit_own_content');
   const [isConnecting, setIsConnecting] = useState(false);
   const [isWaitingAuth, setIsWaitingAuth] = useState(false);
 
@@ -117,7 +120,7 @@ const KlavisSkillItem = memo<KlavisSkillItemProps>(({ serverType, server }) => {
         }
       }, 500);
     },
-    [refreshKlavisServerTools, startFallbackPolling],
+    [startFallbackPolling],
   );
 
   const openOAuthWindow = useCallback(
@@ -137,6 +140,7 @@ const KlavisSkillItem = memo<KlavisSkillItemProps>(({ serverType, server }) => {
   );
 
   const handleConnect = async () => {
+    if (!canCreate || !canEdit) return;
     if (!userId) return;
     if (server) return;
 
@@ -163,6 +167,7 @@ const KlavisSkillItem = memo<KlavisSkillItemProps>(({ serverType, server }) => {
   };
 
   const handleDisconnect = () => {
+    if (!canEdit) return;
     if (!server) return;
     modal.confirm({
       cancelText: t('cancel', { ns: 'common' }),
@@ -225,18 +230,27 @@ const KlavisSkillItem = memo<KlavisSkillItemProps>(({ serverType, server }) => {
 
     if (!server) {
       return (
-        <Button icon={<Icon icon={SquareArrowOutUpRight} />} type="default" onClick={handleConnect}>
-          {t('tools.klavis.connect', { defaultValue: 'Connect' })}
-        </Button>
+        <Tooltip title={!canCreate ? createReason : editReason}>
+          <Button
+            disabled={!canCreate || !canEdit}
+            icon={<Icon icon={SquareArrowOutUpRight} />}
+            type="default"
+            onClick={handleConnect}
+          >
+            {t('tools.klavis.connect', { defaultValue: 'Connect' })}
+          </Button>
+        </Tooltip>
       );
     }
 
     if (server.status === KlavisServerStatus.PENDING_AUTH) {
       return (
         <Button
+          disabled={!canCreate || !canEdit}
           icon={<Icon icon={SquareArrowOutUpRight} />}
           type="default"
           onClick={() => {
+            if (!canCreate || !canEdit) return;
             if (server.oauthUrl) {
               openOAuthWindow(server.oauthUrl, server.identifier);
             }
@@ -257,11 +271,14 @@ const KlavisSkillItem = memo<KlavisSkillItemProps>(({ serverType, server }) => {
               icon: <Icon icon={Unplug} />,
               key: 'disconnect',
               label: t('tools.klavis.disconnect', { defaultValue: 'Disconnect' }),
+              disabled: !canEdit,
               onClick: handleDisconnect,
             },
           ]}
         >
-          <LobeButton icon={MoreHorizontalIcon} />
+          <Tooltip title={editReason}>
+            <LobeButton disabled={!canEdit} icon={MoreHorizontalIcon} />
+          </Tooltip>
         </DropdownMenu>
       );
     }

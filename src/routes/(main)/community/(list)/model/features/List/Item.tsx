@@ -7,11 +7,12 @@ import dayjs from 'dayjs';
 import { ClockIcon } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import urlJoin from 'url-join';
 
 import { ModelInfoTags } from '@/components/ModelSelect';
 import PublishedTime from '@/components/PublishedTime';
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
 import { type DiscoverModelItem } from '@/types/discover';
 
 import ModelTypeIcon from './ModelTypeIcon';
@@ -51,18 +52,9 @@ const styles = createStaticStyles(({ css, cssVar }) => {
 });
 
 const ModelItem = memo<DiscoverModelItem>(
-  ({
-    description,
-    identifier,
-    displayName,
-    contextWindowTokens,
-    releasedAt,
-    type,
-    abilities,
-    providers,
-  }) => {
+  ({ identifier, displayName, contextWindowTokens, releasedAt, type, abilities, providers }) => {
     const { t } = useTranslation(['models', 'discover']);
-    const navigate = useNavigate();
+    const navigate = useWorkspaceAwareNavigate();
     const link = urlJoin('/community/model', identifier);
     return (
       <Block
@@ -138,7 +130,7 @@ const ModelItem = memo<DiscoverModelItem>(
               rows: 3,
             }}
           >
-            {t(`${identifier}.description`, { defaultValue: description })}
+            {t(`${identifier}.description`)}
           </Text>
         </Flexbox>
         <Flexbox

@@ -3,6 +3,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import type { AgentBotProviderItem, NewAgentBotProvider } from '../schemas';
 import { agentBotProviders } from '../schemas';
 import type { LobeChatDatabase } from '../type';
+import { buildWorkspacePayload, buildWorkspaceWhere } from '../utils/workspace';
 
 interface GateKeeper {
   decrypt: (ciphertext: string) => Promise<{ plaintext: string }>;
@@ -16,13 +17,18 @@ export interface DecryptedBotProvider extends Omit<AgentBotProviderItem, 'creden
 export class AgentBotProviderModel {
   private userId: string;
   private db: LobeChatDatabase;
+  private workspaceId?: string;
   private gateKeeper?: GateKeeper;
 
-  constructor(db: LobeChatDatabase, userId: string, gateKeeper?: GateKeeper) {
+  constructor(db: LobeChatDatabase, userId: string, gateKeeper?: GateKeeper, workspaceId?: string) {
     this.userId = userId;
     this.db = db;
+    this.workspaceId = workspaceId;
     this.gateKeeper = gateKeeper;
   }
+
+  private ownership = () =>
+    buildWorkspaceWhere({ userId: this.userId, workspaceId: this.workspaceId }, agentBotProviders);
 
   // --------------- User-scoped CRUD ---------------
 
@@ -35,7 +41,12 @@ export class AgentBotProviderModel {
 
     const [result] = await this.db
       .insert(agentBotProviders)
-      .values({ ...params, credentials, userId: this.userId })
+      .values(
+        buildWorkspacePayload(
+          { userId: this.userId, workspaceId: this.workspaceId },
+          { ...params, credentials },
+        ),
+      )
       .returning();
 
     return result;
@@ -44,11 +55,11 @@ export class AgentBotProviderModel {
   delete = async (id: string) => {
     return this.db
       .delete(agentBotProviders)
-      .where(and(eq(agentBotProviders.id, id), eq(agentBotProviders.userId, this.userId)));
+      .where(and(eq(agentBotProviders.id, id), this.ownership()));
   };
 
   query = async (params?: { agentId?: string; platform?: string }) => {
-    const conditions = [eq(agentBotProviders.userId, this.userId)];
+    const conditions = [this.ownership()];
 
     if (params?.agentId) {
       conditions.push(eq(agentBotProviders.agentId, params.agentId));
@@ -70,7 +81,7 @@ export class AgentBotProviderModel {
     const [result] = await this.db
       .select()
       .from(agentBotProviders)
-      .where(and(eq(agentBotProviders.id, id), eq(agentBotProviders.userId, this.userId)))
+      .where(and(eq(agentBotProviders.id, id), this.ownership()))
       .limit(1);
 
     if (!result) return result;
@@ -82,7 +93,7 @@ export class AgentBotProviderModel {
     const results = await this.db
       .select()
       .from(agentBotProviders)
-      .where(and(eq(agentBotProviders.agentId, agentId), eq(agentBotProviders.userId, this.userId)))
+      .where(and(eq(agentBotProviders.agentId, agentId), this.ownership()))
       .orderBy(desc(agentBotProviders.updatedAt));
 
     return Promise.all(results.map((r) => this.decryptRow(r)));
@@ -104,7 +115,7 @@ export class AgentBotProviderModel {
     return this.db
       .update(agentBotProviders)
       .set({ ...updateValue, updatedAt: new Date() })
-      .where(and(eq(agentBotProviders.id, id), eq(agentBotProviders.userId, this.userId)));
+      .where(and(eq(agentBotProviders.id, id), this.ownership()));
   };
 
   // --------------- System-wide static methods ---------------
@@ -139,7 +150,7 @@ export class AgentBotProviderModel {
         and(
           eq(agentBotProviders.platform, platform),
           eq(agentBotProviders.applicationId, applicationId),
-          eq(agentBotProviders.userId, this.userId),
+          this.ownership(),
           eq(agentBotProviders.enabled, true),
         ),
       )

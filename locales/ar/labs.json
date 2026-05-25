@@ -7,6 +7,8 @@
   "features.gatewayMode.title": "تنفيذ الوكيل من جانب الخادم (البوابة)",
   "features.groupChat.desc": "تمكين تنسيق الدردشة الجماعية متعددة الوكلاء.",
   "features.groupChat.title": "دردشة جماعية (متعددة الوكلاء)",
+  "features.heterogeneousAgent.desc": "تفعيل تنفيذ الوكلاء المتعددين باستخدام Claude Code وواجهة أوامر Codex وغيرها من واجهات الأوامر الخاصة بالوكلاء الخارجيين. يؤدي ذلك إلى إنشاء خيار \"وكيل Claude Code\" في قائمة الوكلاء في الشريط الجانبي.",
+  "features.heterogeneousAgent.title": "وكيل غير متجانس (Claude Code)",
   "features.inputMarkdown.desc": "عرض Markdown في منطقة الإدخال في الوقت الفعلي (نص عريض، كتل الشيفرة، جداول، إلخ).",
   "features.inputMarkdown.title": "عرض Markdown في الإدخال",
   "features.messenger.desc": "تحدث إلى وكلائك عبر تطبيق تيليجرام (وتطبيقات المراسلة الأخرى) من خلال روبوت LobeHub المشترك. يضيف علامة تبويب المراسلة في الإعدادات لربط حسابك واختيار الوكيل الذي يتلقى الرسائل.",

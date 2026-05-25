@@ -11,15 +11,8 @@ export interface FollowUpChip {
 
 export type FollowUpHint = { kind: 'onboarding'; phase: OnboardingPhase } | { kind: 'chat' };
 
-export interface FollowUpModelConfig {
-  model: string;
-  provider: string;
-}
-
 export interface FollowUpExtractInput {
   hint?: FollowUpHint;
-  modelConfig: FollowUpModelConfig;
-  threadId?: string;
   topicId: string;
 }
 
@@ -39,14 +32,7 @@ export const FollowUpHintSchema = z.union([
   }),
 ]);
 
-export const FollowUpModelConfigSchema = z.object({
-  model: z.string().min(1),
-  provider: z.string().min(1),
-});
-
 export const FollowUpExtractInputSchema = z.object({
   hint: FollowUpHintSchema.optional(),
-  modelConfig: FollowUpModelConfigSchema,
-  threadId: z.string().optional(),
   topicId: z.string().min(1),
 });

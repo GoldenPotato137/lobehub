@@ -4,7 +4,6 @@ import {
   type DeviceSystemInfo,
   GatewayHttpClient,
 } from '@lobechat/device-gateway-client';
-import type { HeterogeneousAgentType } from '@lobechat/heterogeneous-agents';
 import debug from 'debug';
 
 import { gatewayEnv } from '@/envs/gateway';
@@ -68,7 +67,7 @@ export class DeviceProxy {
   }
 
   async dispatchAgentRun(params: {
-    agentType: HeterogeneousAgentType;
+    agentType: 'claude-code' | 'codex';
     cwd?: string;
     deviceId?: string;
     jwt: string;

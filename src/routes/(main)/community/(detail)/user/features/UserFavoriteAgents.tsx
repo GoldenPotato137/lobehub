@@ -17,10 +17,11 @@ import { ClockIcon, DownloadIcon, Heart } from 'lucide-react';
 import qs from 'query-string';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import urlJoin from 'url-join';
 
 import PublishedTime from '@/components/PublishedTime';
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
 import { useMarketAuth } from '@/layout/AuthProvider/MarketAuth';
 import { type FavoriteAgentItem } from '@/services/social';
 import { socialService } from '@/services/social';
@@ -102,7 +103,7 @@ const FavoriteAgentCard = memo<FavoriteAgentCardProps>(
     showUnfavorite,
   }) => {
     const { t } = useTranslation('discover');
-    const navigate = useNavigate();
+    const navigate = useWorkspaceAwareNavigate();
 
     const link = qs.stringifyUrl(
       {

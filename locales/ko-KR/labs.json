@@ -7,6 +7,8 @@
   "features.gatewayMode.title": "서버 사이드 에이전트 실행(Gateway)",
   "features.groupChat.desc": "다중 도우미 그룹 채팅 조정 기능을 활성화합니다.",
   "features.groupChat.title": "그룹 채팅 (다중 도우미)",
+  "features.heterogeneousAgent.desc": "Claude Code, Codex CLI 및 기타 외부 에이전트 CLI를 통해 이기종 에이전트 실행을 활성화합니다. 사이드바 에이전트 메뉴에 \"Claude Code Agent\" 옵션이 생성됩니다.",
+  "features.heterogeneousAgent.title": "이기종 에이전트(Claude Code)",
   "features.inputMarkdown.desc": "입력 영역에서 실시간으로 Markdown을 렌더링합니다 (굵은 글씨, 코드 블록, 표 등).",
   "features.inputMarkdown.title": "입력창 Markdown 렌더링",
   "features.messenger.desc": "Telegram(및 기타 메신저)을 통해 공유된 LobeHub 봇으로 에이전트와 대화하세요. 계정을 연결하고 메시지를 받을 에이전트를 선택할 수 있는 설정의 메신저 탭이 추가됩니다.",

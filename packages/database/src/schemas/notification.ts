@@ -3,6 +3,7 @@ import { boolean, index, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg
 
 import { createdAt, timestamptz, updatedAt } from './_helpers';
 import { users } from './user';
+import { workspaces } from './workspace';
 
 export const notifications = pgTable(
   'notifications',
@@ -12,6 +13,7 @@ export const notifications = pgTable(
     userId: text('user_id')
       .references(() => users.id, { onDelete: 'cascade' })
       .notNull(),
+    workspaceId: text('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }),
 
     /** High-level grouping for preference toggles, e.g. `budget`, `subscription` */
     category: text('category').notNull(),
@@ -38,6 +40,7 @@ export const notifications = pgTable(
   (table) => [
     /** General-purpose FK index for cascade deletes and unfiltered queries */
     index('idx_notifications_user').on(table.userId),
+    index('idx_notifications_workspace').on(table.workspaceId),
     /** Inbox list: non-archived notifications ordered by time, with cursor pagination */
     index('idx_notifications_user_active')
       .on(table.userId, table.createdAt)
@@ -46,8 +49,19 @@ export const notifications = pgTable(
     index('idx_notifications_user_unread')
       .on(table.userId)
       .where(sql`${table.isRead} = false AND ${table.isArchived} = false`),
-    /** Idempotent notification creation via ON CONFLICT */
-    uniqueIndex('idx_notifications_dedupe').on(table.userId, table.dedupeKey),
+    /**
+     * Idempotent notification creation via ON CONFLICT. Partitioned by
+     * workspace so a personal dedupe key does not silently swallow a
+     * workspace-scoped event that happens to share the same key (e.g. a
+     * `budget_exhausted` notification fired for both personal and workspace
+     * budgets).
+     */
+    uniqueIndex('idx_notifications_dedupe')
+      .on(table.userId, table.dedupeKey)
+      .where(sql`${table.workspaceId} IS NULL`),
+    uniqueIndex('idx_notifications_dedupe_workspace')
+      .on(table.workspaceId, table.userId, table.dedupeKey)
+      .where(sql`${table.workspaceId} IS NOT NULL`),
     /** Cron cleanup: find archived notifications older than retention period */
     index('idx_notifications_archived_cleanup')
       .on(table.updatedAt, table.createdAt, table.id)

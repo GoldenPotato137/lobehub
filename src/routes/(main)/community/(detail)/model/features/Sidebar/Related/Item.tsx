@@ -26,7 +26,7 @@ const styles = createStaticStyles(({ css, cssVar }) => {
   };
 });
 
-const RelatedItem = memo<DiscoverModelItem>(({ description, identifier, displayName }) => {
+const RelatedItem = memo<DiscoverModelItem>(({ identifier, displayName }) => {
   const { t } = useTranslation('models');
   return (
     <Block horizontal gap={12} key={identifier} padding={12} variant={'outlined'}>
@@ -48,7 +48,7 @@ const RelatedItem = memo<DiscoverModelItem>(({ description, identifier, displayN
             rows: 2,
           }}
         >
-          {t(`${identifier}.description`, { defaultValue: description })}
+          {t(`${identifier}.description`)}
         </Text>
       </Flexbox>
     </Block>

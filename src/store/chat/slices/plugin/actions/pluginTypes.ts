@@ -2,9 +2,9 @@ import { type ChatToolPayload, type RuntimeStepContext } from '@lobechat/types';
 import debug from 'debug';
 
 import { type MCPToolCallResult } from '@/libs/mcp';
+import { truncateToolResult } from '@/server/utils/truncateToolResult';
 import { mcpService } from '@/services/mcp';
 import { messageService } from '@/services/message';
-import { archiveToolResultViaServer } from '@/services/toolResultArchive';
 import { AI_RUNTIME_OPERATION_TYPES } from '@/store/chat/slices/operation';
 import { type ChatStore } from '@/store/chat/store';
 import { useToolStore } from '@/store/tool';
@@ -176,14 +176,7 @@ export class PluginTypesActionImpl {
       });
 
       // When error exists but content is empty, backfill error message into content
-      const rawContent = result.content || result.error?.message || '';
-      const content = await archiveToolResultViaServer({
-        agentId,
-        content: rawContent,
-        identifier: payload.identifier,
-        toolCallId: payload.id,
-        topicId,
-      });
+      const content = result.content || result.error?.message || '';
 
       // Use optimisticUpdateToolMessage to batch update content, state, error, metadata
       await optimisticUpdateToolMessage(
@@ -302,15 +295,8 @@ export class PluginTypesActionImpl {
 
     if (!data) return;
 
-    // Archive oversized content (or truncate if archive context unavailable)
-    const rawContent = data.content || (data.error as any)?.message || '';
-    const truncatedContent = await archiveToolResultViaServer({
-      agentId: message?.agentId,
-      content: rawContent,
-      identifier: payload.identifier,
-      toolCallId: payload.id,
-      topicId: message?.topicId,
-    });
+    // Truncate content to prevent context overflow
+    const truncatedContent = truncateToolResult(data.content || (data.error as any)?.message || '');
 
     // operationId already declared above, reuse it
     const context = operationId ? { operationId } : undefined;
@@ -384,14 +370,7 @@ export class PluginTypesActionImpl {
     // If error occurred, exit
     if (!data) return;
 
-    const rawContent = data.content || (data.error as any)?.message || '';
-    const remoteContent = await archiveToolResultViaServer({
-      agentId: message?.agentId,
-      content: rawContent,
-      identifier: payload.identifier,
-      toolCallId: payload.id,
-      topicId: message?.topicId,
-    });
+    const remoteContent = data.content || (data.error as any)?.message || '';
     const context = operationId ? { operationId } : undefined;
 
     // Use optimisticUpdateToolMessage to update content and state/error in a single call

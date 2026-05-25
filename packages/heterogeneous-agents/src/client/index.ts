@@ -5,10 +5,7 @@ import {
   getHeterogeneousAgentConfig,
   HETEROGENEOUS_AGENT_CONFIGS,
   type HeterogeneousAgentConfig,
-  isRemoteHeterogeneousType,
 } from '../config';
-
-export { isRemoteHeterogeneousType };
 
 export interface HeterogeneousAgentClientConfig extends HeterogeneousAgentConfig {
   avatar: string;
@@ -32,7 +29,7 @@ export const HETEROGENEOUS_AGENT_CLIENT_CONFIGS = HETEROGENEOUS_AGENT_CONFIGS.ma
   icon: heterogeneousAgentIcons[config.type],
 })) as readonly HeterogeneousAgentClientConfig[];
 
-export const getHeterogeneousAgentClientConfig = (type: string) => {
+export const getHeterogeneousAgentClientConfig = (type: HeterogeneousAgentConfig['type']) => {
   const config = getHeterogeneousAgentConfig(type);
 
   if (!config) return undefined;
@@ -40,6 +37,6 @@ export const getHeterogeneousAgentClientConfig = (type: string) => {
   return {
     ...config,
     avatar: createAgentAvatar(config.iconId),
-    icon: heterogeneousAgentIcons[config.type as keyof typeof heterogeneousAgentIcons],
+    icon: heterogeneousAgentIcons[config.type],
   } satisfies HeterogeneousAgentClientConfig;
 };

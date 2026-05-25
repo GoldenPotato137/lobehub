@@ -8,13 +8,15 @@ import { eq, inArray } from 'drizzle-orm';
 import { after } from 'next/server';
 import { z } from 'zod';
 
+import { withScopedPermission } from '@/business/server/trpc-middlewares/rbacPermission';
+import { wsCompatProcedure } from '@/business/server/trpc-middlewares/workspaceAuth';
 import { MessageModel } from '@/database/models/message';
 import { TopicModel } from '@/database/models/topic';
 import { TopicShareModel } from '@/database/models/topicShare';
 import { AgentMigrationRepo } from '@/database/repositories/agentMigration';
 import { TopicImporterRepo } from '@/database/repositories/topicImporter';
 import { agents, chatGroups, chatGroupsAgents } from '@/database/schemas';
-import { authedProcedure, router } from '@/libs/trpc/lambda';
+import { router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { type BatchTaskResult } from '@/types/service';
 
@@ -25,15 +27,16 @@ import {
 } from './_helpers/resolveContext';
 import { basicContextSchema } from './_schema/context';
 
-const topicProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
+const topicProcedure = wsCompatProcedure.use(serverDatabase).use(async (opts) => {
   const { ctx } = opts;
+  const wsId = ctx.workspaceId ?? undefined;
 
   return opts.next({
     ctx: {
       agentMigrationRepo: new AgentMigrationRepo(ctx.serverDB, ctx.userId),
       topicImporterRepo: new TopicImporterRepo(ctx.serverDB, ctx.userId),
-      topicModel: new TopicModel(ctx.serverDB, ctx.userId),
-      topicShareModel: new TopicShareModel(ctx.serverDB, ctx.userId),
+      topicModel: new TopicModel(ctx.serverDB, ctx.userId, wsId),
+      topicShareModel: new TopicShareModel(ctx.serverDB, ctx.userId, wsId),
     },
   });
 });
@@ -59,7 +62,8 @@ export const topicRouter = router({
       }
 
       // Fallback: fetch recent messages with correct agentId/groupId
-      const messageModel = new MessageModel(ctx.serverDB, ctx.userId);
+      const wsId = ctx.workspaceId ?? undefined;
+      const messageModel = new MessageModel(ctx.serverDB, ctx.userId, wsId);
       const messages = await messageModel.query({
         agentId: topic.agentId ?? undefined,
         groupId: topic.groupId ?? undefined,
@@ -82,6 +86,7 @@ export const topicRouter = router({
     }),
 
   batchCreateTopics: topicProcedure
+    .use(withScopedPermission('topic:create'))
     .input(
       z.array(
         z
@@ -114,18 +119,21 @@ export const topicRouter = router({
     }),
 
   batchDelete: topicProcedure
+    .use(withScopedPermission('topic:delete'))
     .input(z.object({ ids: z.array(z.string()) }))
     .mutation(async ({ input, ctx }) => {
       return ctx.topicModel.batchDelete(input.ids);
     }),
 
   batchDeleteByAgentId: topicProcedure
+    .use(withScopedPermission('topic:delete'))
     .input(z.object({ agentId: z.string() }))
     .mutation(async ({ input, ctx }) => {
       return ctx.topicModel.batchDeleteByAgentId(input.agentId);
     }),
 
   batchDeleteBySessionId: topicProcedure
+    .use(withScopedPermission('topic:delete'))
     .input(
       z.object({
         agentId: z.string().optional(),
@@ -143,6 +151,7 @@ export const topicRouter = router({
     }),
 
   cloneTopic: topicProcedure
+    .use(withScopedPermission('topic:create'))
     .input(z.object({ id: z.string(), newTitle: z.string().optional() }))
     .mutation(async ({ input, ctx }) => {
       const data = await ctx.topicModel.duplicate(input.id, input.newTitle);
@@ -167,6 +176,7 @@ export const topicRouter = router({
     }),
 
   createTopic: topicProcedure
+    .use(withScopedPermission('topic:create'))
     .input(
       z
         .object({
@@ -195,6 +205,7 @@ export const topicRouter = router({
    * Disable sharing for a topic (deletes share record)
    */
   disableSharing: topicProcedure
+    .use(withScopedPermission('topic:update'))
     .input(z.object({ topicId: z.string() }))
     .mutation(async ({ input, ctx }) => {
       return ctx.topicShareModel.deleteByTopicId(input.topicId);
@@ -204,6 +215,7 @@ export const topicRouter = router({
    * Enable sharing for a topic (creates share record)
    */
   enableSharing: topicProcedure
+    .use(withScopedPermission('topic:update'))
     .input(
       z.object({
         topicId: z.string(),
@@ -317,6 +329,7 @@ export const topicRouter = router({
   }),
 
   importTopic: topicProcedure
+    .use(withScopedPermission('topic:create'))
     .input(
       z.object({
         agentId: z.string(),
@@ -492,11 +505,14 @@ export const topicRouter = router({
       });
     }),
 
-  removeAllTopics: topicProcedure.mutation(async ({ ctx }) => {
-    return ctx.topicModel.deleteAll();
-  }),
+  removeAllTopics: topicProcedure
+    .use(withScopedPermission('topic:delete'))
+    .mutation(async ({ ctx }) => {
+      return ctx.topicModel.deleteAll();
+    }),
 
   removeTopic: topicProcedure
+    .use(withScopedPermission('topic:delete'))
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
       return ctx.topicModel.delete(input.id);
@@ -525,6 +541,7 @@ export const topicRouter = router({
    * Update share visibility
    */
   updateShareVisibility: topicProcedure
+    .use(withScopedPermission('topic:update'))
     .input(
       z.object({
         topicId: z.string(),
@@ -536,6 +553,7 @@ export const topicRouter = router({
     }),
 
   updateTopic: topicProcedure
+    .use(withScopedPermission('topic:update'))
     .input(
       z.object({
         id: z.string(),
@@ -582,6 +600,7 @@ export const topicRouter = router({
     }),
 
   updateTopicMetadata: topicProcedure
+    .use(withScopedPermission('topic:update'))
     .input(
       z.object({
         id: z.string(),
@@ -625,13 +644,6 @@ export const topicRouter = router({
           runningOperation: z
             .object({
               assistantMessageId: z.string(),
-              completionWebhook: z
-                .object({
-                  body: z.record(z.unknown()).optional(),
-                  delivery: z.enum(['fetch', 'qstash']).optional(),
-                  url: z.string(),
-                })
-                .optional(),
               operationId: z.string(),
               scope: z.string().optional(),
               threadId: z.string().nullable().optional(),

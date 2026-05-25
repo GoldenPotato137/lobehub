@@ -30,6 +30,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 }));
 
 interface OAuthCredFormProps {
+  disabled?: boolean;
   onBack: () => void;
   onSuccess: () => void;
 }
@@ -41,7 +42,7 @@ interface FormValues {
   oauthConnectionId: number;
 }
 
-const OAuthCredForm: FC<OAuthCredFormProps> = ({ onBack, onSuccess }) => {
+const OAuthCredForm: FC<OAuthCredFormProps> = ({ disabled, onBack, onSuccess }) => {
   const { t } = useTranslation('setting');
   const [form] = Form.useForm<FormValues>();
 
@@ -51,8 +52,10 @@ const OAuthCredForm: FC<OAuthCredFormProps> = ({ onBack, onSuccess }) => {
   const connections = connectionsData?.connections ?? [];
 
   const createMutation = useMutation({
-    mutationFn: (values: FormValues) => {
-      return lambdaClient.market.creds.createOAuth.mutate({
+    mutationFn: async (values: FormValues) => {
+      if (disabled) return;
+
+      await lambdaClient.market.creds.createOAuth.mutate({
         description: values.description,
         key: values.key,
         name: values.name,
@@ -65,6 +68,8 @@ const OAuthCredForm: FC<OAuthCredFormProps> = ({ onBack, onSuccess }) => {
   });
 
   const handleSubmit = (values: FormValues) => {
+    if (disabled) return;
+
     createMutation.mutate(values);
   };
 
@@ -94,7 +99,7 @@ const OAuthCredForm: FC<OAuthCredFormProps> = ({ onBack, onSuccess }) => {
         name="oauthConnectionId"
         rules={[{ required: true, message: t('creds.form.connectionRequired') }]}
       >
-        <Select placeholder={t('creds.form.selectConnectionPlaceholder')}>
+        <Select disabled={disabled} placeholder={t('creds.form.selectConnectionPlaceholder')}>
           {connections.map((conn: any) => {
             const provider = conn.providerId || 'OAuth';
             const displayName =
@@ -122,7 +127,7 @@ const OAuthCredForm: FC<OAuthCredFormProps> = ({ onBack, onSuccess }) => {
           { pattern: /^[\w-]+$/, message: t('creds.form.keyPattern') },
         ]}
       >
-        <Input placeholder="e.g., github-oauth" />
+        <Input disabled={disabled} placeholder="e.g., github-oauth" />
       </Form.Item>
 
       <Form.Item
@@ -130,16 +135,25 @@ const OAuthCredForm: FC<OAuthCredFormProps> = ({ onBack, onSuccess }) => {
         name="name"
         rules={[{ required: true, message: t('creds.form.nameRequired') }]}
       >
-        <Input placeholder="e.g., GitHub Connection" />
+        <Input disabled={disabled} placeholder="e.g., GitHub Connection" />
       </Form.Item>
 
       <Form.Item label={t('creds.form.description')} name="description">
-        <Input.TextArea placeholder={t('creds.form.descriptionPlaceholder')} rows={2} />
+        <Input.TextArea
+          disabled={disabled}
+          placeholder={t('creds.form.descriptionPlaceholder')}
+          rows={2}
+        />
       </Form.Item>
 
       <div className={styles.footer}>
         <Button onClick={onBack}>{t('creds.form.back')}</Button>
-        <Button htmlType="submit" loading={createMutation.isPending} type="primary">
+        <Button
+          disabled={disabled}
+          htmlType="submit"
+          loading={createMutation.isPending}
+          type="primary"
+        >
           {t('creds.form.submit')}
         </Button>
       </div>

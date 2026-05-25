@@ -1,13 +1,14 @@
 'use client';
 
 import { type FormGroupItemType } from '@lobehub/ui';
-import { Form, Icon, Select, Skeleton } from '@lobehub/ui';
+import { Form, Icon, Select, Skeleton, Tooltip } from '@lobehub/ui';
 import isEqual from 'fast-deep-equal';
 import { Loader2Icon } from 'lucide-react';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { FORM_STYLE } from '@/const/layoutTokens';
+import { usePermission } from '@/hooks/usePermission';
 import { useUserStore } from '@/store/user';
 import { settingsSelectors } from '@/store/user/selectors';
 
@@ -15,6 +16,7 @@ import { opeanaiSTTOptions, opeanaiTTSOptions } from './const';
 
 const OpenAI = memo(() => {
   const { t } = useTranslation('setting');
+  const { allowed: canManageServiceModel, reason } = usePermission('manage_settings');
   const [form] = Form.useForm();
   const { tts } = useUserStore(settingsSelectors.currentSettings, isEqual);
   const [setSettings, isUserStateInit] = useUserStore((s) => [s.setSettings, s.isUserStateInit]);
@@ -25,12 +27,20 @@ const OpenAI = memo(() => {
   const openai: FormGroupItemType = {
     children: [
       {
-        children: <Select options={opeanaiTTSOptions} />,
+        children: (
+          <Tooltip title={reason}>
+            <Select disabled={!canManageServiceModel} options={opeanaiTTSOptions} />
+          </Tooltip>
+        ),
         label: t('settingTTS.openai.ttsModel'),
         name: ['openAI', 'ttsModel'],
       },
       {
-        children: <Select options={opeanaiSTTOptions} />,
+        children: (
+          <Tooltip title={reason}>
+            <Select disabled={!canManageServiceModel} options={opeanaiSTTOptions} />
+          </Tooltip>
+        ),
         label: t('settingTTS.openai.sttModel'),
         name: ['openAI', 'sttModel'],
       },
@@ -48,6 +58,8 @@ const OpenAI = memo(() => {
       itemsType={'group'}
       variant={'filled'}
       onValuesChange={async (values) => {
+        if (!canManageServiceModel) return;
+
         setLoading(true);
         await setSettings({
           tts: values,

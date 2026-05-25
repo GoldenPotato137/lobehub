@@ -1,5 +1,4 @@
 import { LOBE_CHAT_CLOUD } from '@lobechat/business-const';
-import { inferImageMimeTypeFromBytes } from '@lobechat/utils';
 import { t } from 'i18next';
 import { sha256 } from 'js-sha256';
 
@@ -54,20 +53,6 @@ interface UploadWithProgressResult {
   url: string;
 }
 
-const normalizeUploadedImageFileType = async (
-  file: File,
-  fileArrayBuffer: ArrayBuffer,
-): Promise<File> => {
-  const detectedMimeType = await inferImageMimeTypeFromBytes(fileArrayBuffer);
-
-  if (!detectedMimeType || detectedMimeType === file.type) return file;
-
-  return new File([file], file.name, {
-    lastModified: file.lastModified,
-    type: detectedMimeType,
-  });
-};
-
 type Setter = StoreSetter<FileStore>;
 export const createFileUploadSlice = (set: Setter, get: () => FileStore, _api?: unknown) =>
   new FileUploadActionImpl(set, get, _api);
@@ -112,10 +97,9 @@ export class FileUploadActionImpl {
 
     try {
       const fileArrayBuffer = await file.arrayBuffer();
-      const normalizedFile = await normalizeUploadedImageFileType(file, fileArrayBuffer);
 
       // 1. extract image dimensions if applicable
-      const dimensions = await getImageDimensions(normalizedFile);
+      const dimensions = await getImageDimensions(file);
 
       // 2. check file hash
       const hash = sha256(fileArrayBuffer);
@@ -134,14 +118,14 @@ export class FileUploadActionImpl {
       }
       // 3. if file don't exist, need upload files
       else {
-        const { data, success } = await uploadService.uploadFileToS3(normalizedFile, {
+        const { data, success } = await uploadService.uploadFileToS3(file, {
           abortController,
           onNotSupported: () => {
             onStatusUpdate?.({ id: statusId, type: 'removeFile' });
             message.info({
               content: t('upload.fileOnlySupportInServerMode', {
                 cloud: LOBE_CHAT_CLOUD,
-                ext: normalizedFile.name.split('.').pop(),
+                ext: file.name.split('.').pop(),
                 ns: 'error',
               }),
               duration: 5,
@@ -162,9 +146,9 @@ export class FileUploadActionImpl {
       }
 
       // 4. use more powerful file type detector to get file type
-      let fileType = normalizedFile.type;
+      let fileType = file.type;
 
-      if (!normalizedFile.type) {
+      if (!file.type) {
         const { fileTypeFromBuffer } = await import('file-type');
 
         const type = await fileTypeFromBuffer(fileArrayBuffer);
@@ -177,9 +161,9 @@ export class FileUploadActionImpl {
           fileType,
           hash,
           metadata,
-          name: normalizedFile.name,
+          name: file.name,
           parentId,
-          size: normalizedFile.size,
+          size: file.size,
           source,
           url: metadata.path || checkStatus.url,
         },
@@ -197,7 +181,7 @@ export class FileUploadActionImpl {
         },
       });
 
-      return { ...data, dimensions, filename: normalizedFile.name };
+      return { ...data, dimensions, filename: file.name };
     } catch (error) {
       // Handle file storage plan limit error
       if ((error as any)?.message?.includes('beyond the plan limit')) {

@@ -1,8 +1,9 @@
 'use client';
 
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
 import { useMarketAuth, useMarketUserProfile } from '@/layout/AuthProvider/MarketAuth';
 import { type MarketUserProfile } from '@/layout/AuthProvider/MarketAuth/types';
 import { useDiscoverStore } from '@/store/discover';
@@ -21,7 +22,7 @@ interface UserDetailPageProps {
 const UserDetailPage = memo<UserDetailPageProps>(({ mobile }) => {
   const params = useParams<{ slug: string }>();
   const username = decodeURIComponent(params.slug ?? '');
-  const navigate = useNavigate();
+  const navigate = useWorkspaceAwareNavigate();
 
   const { checkAndShowClaimableResources, getCurrentUserInfo, isAuthenticated, openProfileSetup } =
     useMarketAuth();

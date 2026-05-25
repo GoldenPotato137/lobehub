@@ -7,6 +7,12 @@ import { spendRouter } from '@/business/server/lambda-routers/spend';
 import { subscriptionRouter } from '@/business/server/lambda-routers/subscription';
 import { taskTemplateRouter } from '@/business/server/lambda-routers/taskTemplate';
 import { topUpRouter } from '@/business/server/lambda-routers/topUp';
+import { workspaceRouter } from '@/business/server/lambda-routers/workspace';
+import { workspaceAuditLogRouter } from '@/business/server/lambda-routers/workspaceAuditLog';
+import { workspaceCreditsRouter } from '@/business/server/lambda-routers/workspaceCredits';
+import { workspaceDataRouter } from '@/business/server/lambda-routers/workspaceData';
+import { workspaceMemberRouter } from '@/business/server/lambda-routers/workspaceMember';
+import { workspaceUsageRouter } from '@/business/server/lambda-routers/workspaceUsage';
 import { publicProcedure, router } from '@/libs/trpc/lambda';
 
 import { agentRouter } from './agent';
@@ -43,7 +49,6 @@ import { importerRouter } from './importer';
 import { klavisRouter } from './klavis';
 import { knowledgeRouter } from './knowledge';
 import { knowledgeBaseRouter } from './knowledgeBase';
-import { llmGenerationTracingRouter } from './llmGenerationTracing';
 import { marketRouter } from './market';
 import { messageRouter } from './message';
 import { messengerRouter } from './messenger';
@@ -66,7 +71,6 @@ import { userRouter } from './user';
 import { userMemoriesRouter } from './userMemories';
 import { userMemoryRouter } from './userMemory';
 import { videoRouter } from './video';
-import { webBrowsingRouter } from './webBrowsing';
 
 export const lambdaRouter = router({
   agent: agentRouter,
@@ -105,7 +109,6 @@ export const lambdaRouter = router({
   klavis: klavisRouter,
   knowledge: knowledgeRouter,
   knowledgeBase: knowledgeBaseRouter,
-  llmGenerationTracing: llmGenerationTracingRouter,
   market: marketRouter,
   message: messageRouter,
   messenger: messengerRouter,
@@ -127,7 +130,12 @@ export const lambdaRouter = router({
   userMemories: userMemoriesRouter,
   userMemory: userMemoryRouter,
   video: videoRouter,
-  webBrowsing: webBrowsingRouter,
+  workspace: workspaceRouter,
+  workspaceAuditLog: workspaceAuditLogRouter,
+  workspaceCredits: workspaceCreditsRouter,
+  workspaceData: workspaceDataRouter,
+  workspaceMember: workspaceMemberRouter,
+  workspaceUsage: workspaceUsageRouter,
   accountDeletion: accountDeletionRouter,
   referral: referralRouter,
   spend: spendRouter,

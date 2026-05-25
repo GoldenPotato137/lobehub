@@ -3,6 +3,8 @@ import { z } from 'zod';
 
 import { businessFileUploadCheck } from '@/business/server/lambda-routers/file';
 import { checkFileStorageUsage } from '@/business/server/trpc-middlewares/lambda';
+import { withScopedPermission } from '@/business/server/trpc-middlewares/rbacPermission';
+import { wsCompatProcedure } from '@/business/server/trpc-middlewares/workspaceAuth';
 import { serverDBEnv } from '@/config/db';
 import { AsyncTaskModel } from '@/database/models/asyncTask';
 import { ChunkModel } from '@/database/models/chunk';
@@ -10,7 +12,7 @@ import { DocumentModel } from '@/database/models/document';
 import { FileModel } from '@/database/models/file';
 import { KnowledgeRepo } from '@/database/repositories/knowledge';
 import { appEnv } from '@/envs/app';
-import { authedProcedure, router } from '@/libs/trpc/lambda';
+import { router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { DocumentService } from '@/server/services/document';
 import { FileService } from '@/server/services/file';
@@ -102,50 +104,34 @@ const getKnowledgeItemStatusMap = async (
   );
 };
 
-const isStoredObjectAvailable = async (fileService: FileService, url: string): Promise<boolean> => {
-  try {
-    // Hash records can outlive their backing object, for example when generated
-    // assets are cleaned up but the global hash row remains. Treat stale rows as
-    // missing so the client uploads a fresh copy instead of reusing a dead key.
-    await fileService.getFileMetadata(url);
-    return true;
-  } catch (error) {
-    console.error('Failed to verify existing file hash storage object:', error);
-    return false;
-  }
-};
-
-const fileProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
+const fileProcedure = wsCompatProcedure.use(serverDatabase).use(async (opts) => {
   const { ctx } = opts;
+  const wsId = ctx.workspaceId ?? undefined;
 
   return opts.next({
     ctx: {
-      asyncTaskModel: new AsyncTaskModel(ctx.serverDB, ctx.userId),
-      chunkModel: new ChunkModel(ctx.serverDB, ctx.userId),
-      documentModel: new DocumentModel(ctx.serverDB, ctx.userId),
-      documentService: new DocumentService(ctx.serverDB, ctx.userId),
-      fileModel: new FileModel(ctx.serverDB, ctx.userId),
+      asyncTaskModel: new AsyncTaskModel(ctx.serverDB, ctx.userId, wsId),
+      chunkModel: new ChunkModel(ctx.serverDB, ctx.userId, wsId),
+      documentModel: new DocumentModel(ctx.serverDB, ctx.userId, wsId),
+      documentService: new DocumentService(ctx.serverDB, ctx.userId, wsId),
+      fileModel: new FileModel(ctx.serverDB, ctx.userId, wsId),
       fileService: new FileService(ctx.serverDB, ctx.userId),
-      knowledgeRepo: new KnowledgeRepo(ctx.serverDB, ctx.userId),
+      knowledgeRepo: new KnowledgeRepo(ctx.serverDB, ctx.userId, wsId),
     },
   });
 });
 
 export const fileRouter = router({
   checkFileHash: fileProcedure
+    .use(withScopedPermission('file:upload'))
     .use(checkFileStorageUsage)
     .input(z.object({ hash: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const existingFile = await ctx.fileModel.checkHash(input.hash);
-      const existingHashUrl = existingFile?.isExist ? existingFile.url : undefined;
-      if (!existingHashUrl) return existingFile;
-
-      const isStorageAvailable = await isStoredObjectAvailable(ctx.fileService, existingHashUrl);
-
-      return isStorageAvailable ? existingFile : { isExist: false };
+      return ctx.fileModel.checkHash(input.hash);
     }),
 
   createFile: fileProcedure
+    .use(withScopedPermission('file:upload'))
     .use(checkFileStorageUsage)
     .input(
       UploadFileSchema.omit({ url: true }).extend({
@@ -154,8 +140,7 @@ export const fileRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const existingFile = await ctx.fileModel.checkHash(input.hash!);
-      const { isExist } = existingFile;
+      const { isExist } = await ctx.fileModel.checkHash(input.hash!);
 
       // Resolve parentId if it's a slug
       let resolvedParentId = input.parentId;
@@ -196,28 +181,6 @@ export const fileRouter = router({
           url: input.url,
           userId: ctx.userId,
         });
-
-        let shouldRefreshGlobalFile = false;
-        if (isExist && existingFile.url && existingFile.url !== input.url) {
-          shouldRefreshGlobalFile = !(await isStoredObjectAvailable(
-            ctx.fileService,
-            existingFile.url,
-          ));
-        }
-
-        if (shouldRefreshGlobalFile) {
-          // A user may re-upload the same bytes after the old object key was
-          // removed. Keep the global hash pointer on the newly uploaded object so
-          // future dedup checks do not resolve back to the stale key.
-          await ctx.fileModel.updateGlobalFile(
-            input.hash!,
-            {
-              metadata: input.metadata,
-              url: input.url,
-            },
-            trx,
-          );
-        }
 
         return ctx.fileModel.create(
           {
@@ -420,6 +383,7 @@ export const fileRouter = router({
     }),
 
   deleteKnowledgeItemsByQuery: fileProcedure
+    .use(withScopedPermission('file:delete'))
     .input(QueryFileListSchema)
     .mutation(async ({ ctx, input }): Promise<{ count: number }> => {
       const fileIds: string[] = [];
@@ -546,33 +510,39 @@ export const fileRouter = router({
         .slice(0, limit);
     }),
 
-  removeAllFiles: fileProcedure.mutation(async ({ ctx }) => {
-    // Get all file IDs for this user
-    const allFiles = await ctx.fileModel.query({ showFilesInKnowledgeBase: true });
-    const fileIds = allFiles.map((f) => f.id);
+  removeAllFiles: fileProcedure
+    .use(withScopedPermission('file:delete'))
+    .mutation(async ({ ctx }) => {
+      // Get all file IDs for this user
+      const allFiles = await ctx.fileModel.query({ showFilesInKnowledgeBase: true });
+      const fileIds = allFiles.map((f) => f.id);
 
-    // Use deleteMany to properly handle shared files (globalFiles reference counting)
-    const needToRemoveFileList = await ctx.fileModel.deleteMany(
-      fileIds,
-      serverDBEnv.REMOVE_GLOBAL_FILE,
-    );
+      // Use deleteMany to properly handle shared files (globalFiles reference counting)
+      const needToRemoveFileList = await ctx.fileModel.deleteMany(
+        fileIds,
+        serverDBEnv.REMOVE_GLOBAL_FILE,
+      );
 
-    // Delete S3 files only if no other users reference them
-    if (needToRemoveFileList && needToRemoveFileList.length > 0) {
-      await ctx.fileService.deleteFiles(needToRemoveFileList.map((file) => file.url!));
-    }
-  }),
+      // Delete S3 files only if no other users reference them
+      if (needToRemoveFileList && needToRemoveFileList.length > 0) {
+        await ctx.fileService.deleteFiles(needToRemoveFileList.map((file) => file.url!));
+      }
+    }),
 
-  removeFile: fileProcedure.input(z.object({ id: z.string() })).mutation(async ({ input, ctx }) => {
-    const file = await ctx.fileModel.delete(input.id, serverDBEnv.REMOVE_GLOBAL_FILE);
+  removeFile: fileProcedure
+    .use(withScopedPermission('file:delete'))
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const file = await ctx.fileModel.delete(input.id, serverDBEnv.REMOVE_GLOBAL_FILE);
 
-    if (!file) return;
+      if (!file) return;
 
-    // delete the file from S3 if it is not used by other files
-    await ctx.fileService.deleteFile(file.url!);
-  }),
+      // delete the file from S3 if it is not used by other files
+      await ctx.fileService.deleteFile(file.url!);
+    }),
 
   removeFileAsyncTask: fileProcedure
+    .use(withScopedPermission('file:update'))
     .input(
       z.object({
         id: z.string(),
@@ -592,6 +562,7 @@ export const fileRouter = router({
     }),
 
   removeFiles: fileProcedure
+    .use(withScopedPermission('file:delete'))
     .input(z.object({ ids: z.array(z.string()) }))
     .mutation(async ({ input, ctx }) => {
       const needToRemoveFileList = await ctx.fileModel.deleteMany(
@@ -606,6 +577,7 @@ export const fileRouter = router({
     }),
 
   updateFile: fileProcedure
+    .use(withScopedPermission('file:update'))
     .input(
       z.object({
         id: z.string(),

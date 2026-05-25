@@ -1,5 +1,4 @@
 import type { ChatToolPayload } from '@lobechat/types';
-import { pickTrimmedString, toRecord } from '@lobechat/utils';
 
 import type {
   SelfReviewIdea,
@@ -200,38 +199,40 @@ const parseToolArguments = (value: string | undefined): Record<string, unknown> 
   try {
     const parsed = JSON.parse(value) as unknown;
 
-    return toRecordOrEmpty(parsed);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
   } catch {
     return {};
   }
 };
 
+const getString = (value: unknown) =>
+  typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
+
 const getBoolean = (value: unknown) => (typeof value === 'boolean' ? value : undefined);
 
 const getStringArray = (value: unknown) =>
-  Array.isArray(value)
-    ? value.flatMap((item) => {
-        const text = pickTrimmedString(item);
-        return text ? [text] : [];
-      })
-    : [];
+  Array.isArray(value) ? value.flatMap((item) => (getString(item) ? [getString(item)!] : [])) : [];
 
-const toRecordOrEmpty = (value: unknown): Record<string, unknown> =>
-  (toRecord(value) as Record<string, unknown> | undefined) ?? {};
+const getRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 
 const getBaseSnapshot = (value: unknown): SelfReviewProposalBaseSnapshot | undefined => {
-  const record = toRecordOrEmpty(value);
+  const record = getRecord(value);
   if (Object.keys(record).length === 0) return;
 
   return {
     absent: getBoolean(record.absent),
-    agentDocumentId: pickTrimmedString(record.agentDocumentId),
-    contentHash: pickTrimmedString(record.contentHash),
-    documentId: pickTrimmedString(record.documentId),
-    documentUpdatedAt: pickTrimmedString(record.documentUpdatedAt),
+    agentDocumentId: getString(record.agentDocumentId),
+    contentHash: getString(record.contentHash),
+    documentId: getString(record.documentId),
+    documentUpdatedAt: getString(record.documentUpdatedAt),
     managed: getBoolean(record.managed),
-    skillName: pickTrimmedString(record.skillName),
-    targetTitle: pickTrimmedString(record.targetTitle),
+    skillName: getString(record.skillName),
+    targetTitle: getString(record.targetTitle),
     targetType: record.targetType === 'skill' ? 'skill' : undefined,
     writable: getBoolean(record.writable),
   };
@@ -308,7 +309,7 @@ const getIdempotencyKey = ({
   toolCall?: ChatToolPayload;
   toolName: string;
 }) =>
-  pickTrimmedString(args.idempotencyKey) ??
+  getString(args.idempotencyKey) ??
   outcomeFallbackIdempotencyKey({
     sourceId,
     toolCallId: toolCall?.id,
@@ -328,17 +329,17 @@ const outcomeFallbackIdempotencyKey = ({
 const getSkillCreateOperation = (args: Record<string, unknown>, userId: string) => ({
   domain: 'skill' as const,
   input: {
-    bodyMarkdown: pickTrimmedString(args.bodyMarkdown),
-    description: pickTrimmedString(args.description),
-    name: pickTrimmedString(args.name),
-    title: pickTrimmedString(args.title),
+    bodyMarkdown: getString(args.bodyMarkdown),
+    description: getString(args.description),
+    name: getString(args.name),
+    title: getString(args.title),
     userId,
   },
   operation: 'create' as const,
 });
 
 const getMemoryWriteOperation = (args: Record<string, unknown>, userId: string) => {
-  const content = pickTrimmedString(args.content);
+  const content = getString(args.content);
   if (!content) return;
 
   return {
@@ -349,14 +350,14 @@ const getMemoryWriteOperation = (args: Record<string, unknown>, userId: string) 
 };
 
 const getSkillRefineOperation = (args: Record<string, unknown>, userId: string) => {
-  const skillDocumentId = pickTrimmedString(args.skillDocumentId);
+  const skillDocumentId = getString(args.skillDocumentId);
   if (!skillDocumentId) return;
 
   return {
     domain: 'skill' as const,
     input: {
-      bodyMarkdown: pickTrimmedString(args.bodyMarkdown),
-      description: pickTrimmedString(args.description),
+      bodyMarkdown: getString(args.bodyMarkdown),
+      description: getString(args.description),
       skillDocumentId,
       userId,
     },
@@ -367,19 +368,19 @@ const getSkillRefineOperation = (args: Record<string, unknown>, userId: string) 
 const toEvidenceRefs = (value: unknown): ActionPlan['evidenceRefs'] =>
   Array.isArray(value)
     ? value.flatMap((item) => {
-        const record = toRecordOrEmpty(item);
-        const id = pickTrimmedString(record.id);
-        const type = pickTrimmedString(record.type);
+        const record = getRecord(item);
+        const id = getString(record.id);
+        const type = getString(record.type);
 
         return id && type ? [{ id, type: type as ActionPlan['evidenceRefs'][number]['type'] }] : [];
       })
     : [];
 
 const toTarget = (value: unknown): ActionTarget | undefined => {
-  const record = toRecordOrEmpty(value);
-  const memoryId = pickTrimmedString(record.memoryId);
-  const skillDocumentId = pickTrimmedString(record.skillDocumentId);
-  const skillName = pickTrimmedString(record.skillName);
+  const record = getRecord(value);
+  const memoryId = getString(record.memoryId);
+  const skillDocumentId = getString(record.skillDocumentId);
+  const skillName = getString(record.skillName);
   const targetReadonly = getBoolean(record.targetReadonly);
 
   if (!memoryId && !skillDocumentId && !skillName && targetReadonly === undefined) return;
@@ -411,43 +412,43 @@ const toConfidence = (value: unknown) =>
   typeof value === 'number' && Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 1;
 
 const toSkillOperation = (value: unknown, userId: string): ActionPlan['operation'] => {
-  const record = toRecordOrEmpty(value);
+  const record = getRecord(value);
   if (record.domain !== 'skill') return;
 
-  const input = toRecordOrEmpty(record.input);
+  const input = getRecord(record.input);
 
   if (record.operation === 'create') {
     return {
       domain: 'skill',
       input: {
-        bodyMarkdown: pickTrimmedString(input.bodyMarkdown),
-        description: pickTrimmedString(input.description),
-        name: pickTrimmedString(input.name),
-        title: pickTrimmedString(input.title),
-        userId: pickTrimmedString(input.userId) ?? userId,
+        bodyMarkdown: getString(input.bodyMarkdown),
+        description: getString(input.description),
+        name: getString(input.name),
+        title: getString(input.title),
+        userId: getString(input.userId) ?? userId,
       },
       operation: 'create',
     };
   }
 
   if (record.operation === 'refine') {
-    const skillDocumentId = pickTrimmedString(input.skillDocumentId);
+    const skillDocumentId = getString(input.skillDocumentId);
     if (!skillDocumentId) return;
 
     return {
       domain: 'skill',
       input: {
-        bodyMarkdown: pickTrimmedString(input.bodyMarkdown),
-        patch: pickTrimmedString(input.patch),
+        bodyMarkdown: getString(input.bodyMarkdown),
+        patch: getString(input.patch),
         skillDocumentId,
-        userId: pickTrimmedString(input.userId) ?? userId,
+        userId: getString(input.userId) ?? userId,
       },
       operation: 'refine',
     };
   }
 
   if (record.operation === 'consolidate') {
-    const canonicalSkillDocumentId = pickTrimmedString(input.canonicalSkillDocumentId);
+    const canonicalSkillDocumentId = getString(input.canonicalSkillDocumentId);
     const sourceSkillIds = getStringArray(input.sourceSkillIds);
     if (!canonicalSkillDocumentId || sourceSkillIds.length === 0) return;
 
@@ -455,12 +456,12 @@ const toSkillOperation = (value: unknown, userId: string): ActionPlan['operation
       domain: 'skill',
       input: {
         approval: { source: 'proposal' },
-        bodyMarkdown: pickTrimmedString(input.bodyMarkdown),
+        bodyMarkdown: getString(input.bodyMarkdown),
         canonicalSkillDocumentId,
-        description: pickTrimmedString(input.description),
+        description: getString(input.description),
         sourceSkillIds,
         sourceSnapshots: getBaseSnapshots(input.sourceSnapshots),
-        userId: pickTrimmedString(input.userId) ?? userId,
+        userId: getString(input.userId) ?? userId,
       },
       operation: 'consolidate',
     };
@@ -523,10 +524,10 @@ const getProjectionActionFromRaw = ({
   rawAction: unknown;
   userId: string;
 }): SelfReviewProposalPlan['actions'][number] | undefined => {
-  const record = toRecordOrEmpty(rawAction);
+  const record = getRecord(rawAction);
   const actionType = getRawActionType(record.actionType);
   const idempotencyKey =
-    pickTrimmedString(record.idempotencyKey) ?? `${fallbackIdempotencyKey}:action:${index + 1}`;
+    getString(record.idempotencyKey) ?? `${fallbackIdempotencyKey}:action:${index + 1}`;
 
   if (!actionType || actionType === 'proposal_only') return;
 
@@ -542,7 +543,7 @@ const getProjectionActionFromRaw = ({
     applyMode: toApplyMode(record.applyMode, outcome),
     confidence: toConfidence(record.confidence),
     dedupeKey:
-      pickTrimmedString(record.dedupeKey) ??
+      getString(record.dedupeKey) ??
       (target?.skillDocumentId
         ? `skill:${target.skillDocumentId}`
         : target?.skillName
@@ -552,8 +553,7 @@ const getProjectionActionFromRaw = ({
             : actionType),
     evidenceRefs: toEvidenceRefs(record.evidenceRefs),
     idempotencyKey,
-    rationale:
-      pickTrimmedString(record.rationale) ?? outcome.summary ?? 'Self-review proposal action.',
+    rationale: getString(record.rationale) ?? outcome.summary ?? 'Self-review proposal action.',
     risk: toRisk(record.risk),
     ...(operation ? { operation } : {}),
     ...(target ? { target } : {}),
@@ -604,7 +604,7 @@ const getIdeaFromRaw = ({
   index: number;
   rawAction: unknown;
 }): SelfReviewIdea | undefined => {
-  const record = toRecordOrEmpty(rawAction);
+  const record = getRecord(rawAction);
   if (getRawActionType(record.actionType) !== 'proposal_only') return;
 
   const target = toTarget(record.target);
@@ -612,11 +612,11 @@ const getIdeaFromRaw = ({
   return {
     evidenceRefs: toEvidenceRefs(record.evidenceRefs),
     idempotencyKey:
-      pickTrimmedString(record.idempotencyKey) ?? `${fallbackIdempotencyKey}:idea:${index + 1}`,
-    rationale: pickTrimmedString(record.rationale) ?? 'SelfIteration self-review idea.',
+      getString(record.idempotencyKey) ?? `${fallbackIdempotencyKey}:idea:${index + 1}`,
+    rationale: getString(record.rationale) ?? 'SelfIteration self-review idea.',
     risk: toRisk(record.risk),
     ...(target ? { target } : {}),
-    ...(pickTrimmedString(record.title) ? { title: pickTrimmedString(record.title) } : {}),
+    ...(getString(record.title) ? { title: getString(record.title) } : {}),
   };
 };
 
@@ -676,13 +676,13 @@ const getProjectionAction = ({
   userId: string;
 }): SelfReviewProposalPlan['actions'][number] => {
   const actionType = getActionType(toolName);
-  const skillDocumentId = pickTrimmedString(args.skillDocumentId) ?? outcome.resourceId;
-  const skillName = pickTrimmedString(args.name);
+  const skillDocumentId = getString(args.skillDocumentId) ?? outcome.resourceId;
+  const skillName = getString(args.name);
   const baseSnapshot = getBaseSnapshot(args.baseSnapshot);
   const baseAction = {
     applyMode: outcome.status === 'proposed' ? ApplyMode.ProposalOnly : ApplyMode.AutoApply,
     confidence: 1,
-    dedupeKey: pickTrimmedString(args.proposalKey) ?? outcome.resourceId ?? idempotencyKey,
+    dedupeKey: getString(args.proposalKey) ?? outcome.resourceId ?? idempotencyKey,
     evidenceRefs: [],
     idempotencyKey,
     rationale: outcome.summary ?? 'Self-review tool write outcome.',

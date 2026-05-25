@@ -43,7 +43,7 @@
   "claudeCode.askUserQuestion.escape.back": "オプションに戻る",
   "claudeCode.askUserQuestion.escape.enter": "または直接入力してください",
   "claudeCode.askUserQuestion.escape.placeholder": "ここに回答を入力してください…",
-  "claudeCode.askUserQuestion.multiSelectTag": "（複数選択）",
+  "claudeCode.askUserQuestion.multiSelectTag": "（複数選択可）",
   "claudeCode.askUserQuestion.skip": "スキップ",
   "claudeCode.askUserQuestion.submit": "送信",
   "claudeCode.askUserQuestion.timeExpired": "時間切れ — 各質問のオプション1を使用します。",

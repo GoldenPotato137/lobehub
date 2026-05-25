@@ -11,26 +11,6 @@ declare module '../types' {
 
 const log = debug('context-engine:processor:PlaceholderVariablesProcessor');
 
-/**
- * Build a short, log-safe preview of a message's content.
- *
- * `JSON.stringify` returns `undefined` (not a string) for `undefined` /
- * functions / symbols, so naively calling `.slice` on its result crashes —
- * this is exactly how a tool error result with `content: undefined`
- * (e.g. budget-exceeded errors) used to take down the whole processor.
- * Always coerce to a string before slicing.
- */
-const buildContentPreview = (content: unknown): string => {
-  if (typeof content === 'string') return content.slice(0, 200);
-
-  try {
-    const serialized = JSON.stringify(content);
-    return (serialized ?? String(content)).slice(0, 200);
-  } catch {
-    return String(content).slice(0, 200);
-  }
-};
-
 const PLACEHOLDER_START = '{{';
 const PLACEHOLDER_END = '}}';
 
@@ -340,7 +320,10 @@ export class PlaceholderVariablesProcessor extends BaseProcessor {
     for (let i = 0; i < clonedContext.messages.length; i++) {
       const message = clonedContext.messages[i];
 
-      const contentPreview = buildContentPreview(message.content);
+      const contentPreview =
+        typeof message.content === 'string'
+          ? message.content.slice(0, 200)
+          : JSON.stringify(message.content).slice(0, 200);
 
       log(
         'Processing message %d: role=%s, contentType=%s, contentPreview=%s',

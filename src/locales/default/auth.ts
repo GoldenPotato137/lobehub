@@ -241,6 +241,9 @@ export default {
   'stats.updatedAt': 'Updated at',
   'stats.welcome': '{{username}}, this is your <span>{{days}}</span> day with {{appName}}',
   'stats.words': 'Total Words',
+  'stats.workspace.members': '<span>{{count}}</span> members',
+  'stats.workspace.welcome':
+    '<span>{{name}}</span> has been running for <span>{{days}}</span> days',
   'tab.apikey': 'API Key',
   'tab.profile': 'My Account',
   'tab.security': 'Security',
@@ -254,6 +257,9 @@ export default {
   'usage.activeModels.table.model': 'Model',
   'usage.activeModels.table.provider': 'Provider',
   'usage.activeModels.table.spend': 'Spend',
+  'usage.activeModels.table.user': 'User',
+  'usage.activeModels.userTable': 'User List',
+  'usage.activeModels.users': 'Active Users',
   'usage.cards.month.modelCalls': 'Model Calls',
   'usage.cards.month.title': "This Month's Spend",
   'usage.cards.today.title': "Today's Spend",
@@ -271,4 +277,5 @@ export default {
   'usage.trends.tokens': 'Tokens',
   'usage.welcome.model': 'Model',
   'usage.welcome.provider': 'Provider',
+  'usage.welcome.user': 'User',
 };

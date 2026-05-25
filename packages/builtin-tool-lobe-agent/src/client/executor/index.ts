@@ -35,7 +35,6 @@ import {
   type PlanRuntimeService,
 } from './PlanRuntime';
 import { getTodosFromContext } from './planTodoHelper';
-import { resolveClientVisualMediaPayloadItems } from './resolveVisualMediaUris';
 
 const PLAN_DOC_TYPE = 'agent/plan';
 
@@ -290,8 +289,6 @@ class LobeAgentExecutor extends BaseExecutor<typeof LobeAgentApiName> {
       };
     }
 
-    const payloadItems = await resolveClientVisualMediaPayloadItems({ selectedRefs, selectedUrls });
-
     let content = '';
     let error: { message?: string } | undefined;
     let usage: unknown;
@@ -302,7 +299,7 @@ class LobeAgentExecutor extends BaseExecutor<typeof LobeAgentApiName> {
       max_tokens: 2000,
       messages: [
         {
-          content: buildAnalyzeVisualMediaContent(payloadItems, params.question, {
+          content: buildAnalyzeVisualMediaContent(selectedItems, params.question, {
             includeFallbackInstruction: true,
             includeFileSummary: true,
           }),

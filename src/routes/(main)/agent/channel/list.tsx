@@ -78,6 +78,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 interface PlatformListProps {
   activeId: string;
   agentId: string;
+  disabled?: boolean;
   onSelect: (id: string) => void;
   platforms: ChannelPlatformDefinition[];
   providers?: BotProviderItem[];
@@ -85,7 +86,7 @@ interface PlatformListProps {
 }
 
 const PlatformList = memo<PlatformListProps>(
-  ({ platforms, activeId, agentId, onSelect, providers, runtimeStatuses }) => {
+  ({ platforms, activeId, agentId, disabled, onSelect, providers, runtimeStatuses }) => {
     const { t } = useTranslation('agent');
     const theme = useTheme();
     const { modal, message } = App.useApp();
@@ -101,12 +102,17 @@ const PlatformList = memo<PlatformListProps>(
     }, [providers, agentId]);
 
     const handleImport = useCallback(() => {
+      if (disabled) return;
       fileInputRef.current?.click();
-    }, []);
+    }, [disabled]);
 
     const handleFileChange = useCallback(
       async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
+        if (disabled) {
+          e.target.value = '';
+          return;
+        }
         if (!file) return;
 
         try {
@@ -149,10 +155,11 @@ const PlatformList = memo<PlatformListProps>(
           e.target.value = '';
         }
       },
-      [agentId, connectBot, createBotProvider, message, t],
+      [agentId, connectBot, createBotProvider, disabled, message, t],
     );
 
     const handleDeleteAll = useCallback(() => {
+      if (disabled) return;
       if (!providers?.length) return;
       modal.confirm({
         content: t('channel.deleteAllConfirmDesc'),
@@ -169,7 +176,7 @@ const PlatformList = memo<PlatformListProps>(
         title: t('channel.deleteAllConfirm'),
         type: 'warning',
       });
-    }, [agentId, deleteAllBotProviders, message, modal, providers, t]);
+    }, [agentId, deleteAllBotProviders, disabled, message, modal, providers, t]);
 
     const hasProviders = !!providers?.length;
     const menuItems: MenuProps['items'] = [
@@ -183,13 +190,14 @@ const PlatformList = memo<PlatformListProps>(
       {
         icon: <Icon icon={Upload} size={'small'} />,
         key: 'import',
+        disabled,
         label: t('channel.importConfig'),
         onClick: handleImport,
       },
       { type: 'divider' },
       {
         danger: true,
-        disabled: !hasProviders,
+        disabled: disabled || !hasProviders,
         icon: <Icon icon={Trash2} size={'small'} />,
         key: 'deleteAll',
         label: t('channel.deleteAllChannels'),

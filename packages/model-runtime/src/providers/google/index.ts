@@ -1,10 +1,10 @@
+import { GoogleGenAI } from '@google/genai';
 import type {
   GenerateContentConfig,
   HttpOptions,
   ThinkingConfig,
   Tool as GoogleFunctionCallTool,
 } from '@google/genai';
-import { GoogleGenAI } from '@google/genai';
 import debug from 'debug';
 
 import { type LobeRuntimeAI } from '../../core/BaseAI';
@@ -31,8 +31,6 @@ import { createGoogleVideo, pollGoogleVideoOperation } from './createVideo';
 import { createGoogleGenerateObject, createGoogleGenerateObjectWithTools } from './generateObject';
 import { resolveGoogleThinkingConfig } from './thinkingResolver';
 
-export { GOOGLE_IMAGE_TEXT_ONLY_RESPONSE_MESSAGE } from './createImage';
-
 const log = debug('model-runtime:google');
 
 const modelsOffSafetySettings = new Set(['gemini-2.0-flash-exp']);
@@ -48,18 +46,7 @@ const modelsWithModalities = new Set([
   'nano-banana-pro-preview',
 ]);
 
-// These models need the explicit image/web searchTypes payload when googleSearch is enabled.
-// Other search-capable models use the plain `{ googleSearch: {} }` shape.
-const modelsWithImageSearchTypes = new Set(['gemini-3.1-flash-image-preview']);
-
-// Image-response chat models are stricter than text-only chat models because the request
-// also asks Gemini to return images via `responseModalities: ['Text', 'Image']`.
-// For example, gemini-2.5-flash-image rejects googleSearch with:
-// "Search as tool is not enabled for this model", while these models accept googleSearch.
-const imageResponseModelsWithGoogleSearch = new Set([
-  'gemini-3-pro-image-preview',
-  'gemini-3.1-flash-image-preview',
-]);
+const modelsWithImageSearch = new Set(['gemini-3.1-flash-image-preview']);
 
 // Gemini 3+ models support combined tools (search + urlContext + functionDeclarations)
 const isGemini3OrAbove = (model?: string): boolean => {
@@ -203,7 +190,6 @@ export class LobeGoogleAI implements LobeRuntimeAI {
         }
       }
 
-      const tools = this.buildGoogleToolsWithSearch(payload.tools, payload);
       const config: GenerateContentConfig = {
         abortSignal: originalSignal,
         imageConfig:
@@ -248,10 +234,10 @@ export class LobeGoogleAI implements LobeRuntimeAI {
         // https://ai.google.dev/gemini-api/docs/tool-combination
         // Vertex AI does not support includeServerSideToolInvocations
         toolConfig:
-          !this.isVertexAi && this.needsServerSideToolInvocations(model, tools)
+          !this.isVertexAi && this.needsServerSideToolInvocations(payload)
             ? { includeServerSideToolInvocations: true }
             : undefined,
-        tools,
+        tools: this.buildGoogleToolsWithSearch(payload.tools, payload),
         topP: payload.top_p,
       };
 
@@ -512,14 +498,11 @@ export class LobeGoogleAI implements LobeRuntimeAI {
    * in that case.
    * @see https://ai.google.dev/gemini-api/docs/tool-combination
    */
-  private needsServerSideToolInvocations(
-    model: string | undefined,
-    tools: GoogleFunctionCallTool[] | undefined,
-  ): boolean {
-    if (!isGemini3OrAbove(model)) return false;
+  private needsServerSideToolInvocations(payload?: ChatStreamPayload): boolean {
+    if (!isGemini3OrAbove(payload?.model)) return false;
 
-    const hasBuiltIn = tools?.some((tool) => 'googleSearch' in tool || 'urlContext' in tool);
-    const hasFunctions = tools?.some((tool) => Boolean(tool.functionDeclarations?.length));
+    const hasBuiltIn = payload?.enabledSearch || payload?.urlContext;
+    const hasFunctions = payload?.tools && payload.tools.length > 0;
 
     return !!(hasBuiltIn && hasFunctions);
   }
@@ -530,27 +513,15 @@ export class LobeGoogleAI implements LobeRuntimeAI {
   ): GoogleFunctionCallTool[] | undefined {
     const hasSearch = payload?.enabledSearch;
     const hasUrlContext = payload?.urlContext;
-    const model = payload?.model ?? '';
-    const isImageResponseModel = modelsWithModalities.has(model);
-    const supportsImageResponseGoogleSearch = imageResponseModelsWithGoogleSearch.has(model);
 
-    // Build GoogleSearch tool config with the model-specific search payload shape.
-    const googleSearchTool =
-      hasSearch && (!isImageResponseModel || supportsImageResponseGoogleSearch)
-        ? {
-            googleSearch: modelsWithImageSearchTypes.has(model)
-              ? { searchTypes: { imageSearch: {}, webSearch: {} } }
-              : {},
-          }
-        : undefined;
-
-    if (isImageResponseModel) {
-      // Keep only the prebuilt googleSearch tool for image-response models that support it.
-      // In `responseModalities: ['Text', 'Image']` requests, Vertex AI rejects
-      // function declarations and urlContext with INVALID_ARGUMENT:
-      // "Only google search tool and maps imagery grounding tool is supported for image response."
-      return googleSearchTool ? [googleSearchTool] : undefined;
-    }
+    // Build GoogleSearch tool config with optional image search support
+    const googleSearchTool = hasSearch
+      ? {
+          googleSearch: modelsWithImageSearch.has(payload?.model ?? '')
+            ? { searchTypes: { imageSearch: {}, webSearch: {} } }
+            : {},
+        }
+      : undefined;
 
     // Gemini 3+ models support combined tools (search + urlContext + functionDeclarations)
     if (isGemini3OrAbove(payload?.model)) {

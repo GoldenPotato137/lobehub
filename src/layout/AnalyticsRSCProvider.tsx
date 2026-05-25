@@ -22,7 +22,6 @@ const AnalyticsRSCProvider = ({ children }: AnalyticsRSCProviderProps) => {
       postHogConfig={{
         debug: analyticsEnv.DEBUG_POSTHOG_ANALYTICS,
         enabled: analyticsEnv.ENABLED_POSTHOG_ANALYTICS,
-        capture_pageview: 'history_change',
         host: analyticsEnv.POSTHOG_HOST,
         key: analyticsEnv.POSTHOG_KEY ?? '',
         person_profiles: 'always',

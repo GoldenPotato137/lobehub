@@ -4,6 +4,8 @@ import type { ItemType } from 'antd/es/menu/interface';
 import { isNull } from 'es-toolkit/compat';
 import { FileBoxIcon } from 'lucide-react';
 
+import { usePermission } from '@/hooks/usePermission';
+
 import DropdownMenu from '../../ItemDropdown/DropdownMenu';
 import ChunksBadge from './ChunkTag';
 import { styles } from './styles';
@@ -40,58 +42,64 @@ const FileListItemActions = ({
   menuItems,
   parseFiles,
   t,
-}: FileListItemActionsProps) => (
-  <Flexbox
-    horizontal
-    align={'center'}
-    gap={8}
-    paddingInline={8}
-    onClick={stopPropagation}
-    onPointerDown={stopPropagation}
-  >
-    {!isFolder &&
-      !isPage &&
-      (isCreatingFileParseTask || isNull(chunkingStatus) || !chunkingStatus ? (
-        <div
-          className={isCreatingFileParseTask ? undefined : styles.hover}
-          title={t(
-            isSupportedForChunking
-              ? 'FileManager.actions.chunkingTooltip'
-              : 'FileManager.actions.chunkingUnsupported',
-          )}
-        >
-          <Button
-            disabled={!isSupportedForChunking}
-            icon={FileBoxIcon}
-            loading={isCreatingFileParseTask}
-            size={'small'}
-            type={'text'}
-            onClick={() => {
-              parseFiles([id]);
-            }}
-          >
-            {t(
-              isCreatingFileParseTask
-                ? 'FileManager.actions.createChunkingTask'
-                : 'FileManager.actions.chunking',
-            )}
-          </Button>
-        </div>
-      ) : (
-        <div style={{ cursor: 'default' }}>
-          <ChunksBadge
-            chunkCount={chunkCount}
-            chunkingError={chunkingError}
-            chunkingStatus={chunkingStatus as any}
-            embeddingError={embeddingError}
-            embeddingStatus={embeddingStatus as any}
-            finishEmbedding={finishEmbedding}
-            id={id}
-          />
-        </div>
-      ))}
-    <DropdownMenu className={styles.hover} items={menuItems} />
-  </Flexbox>
-);
+}: FileListItemActionsProps) => {
+  const { allowed: canEditResources } = usePermission('edit_own_content');
+
+  return (
+    <Flexbox
+      horizontal
+      align={'center'}
+      gap={8}
+      paddingInline={8}
+      onClick={stopPropagation}
+      onPointerDown={stopPropagation}
+    >
+      {!isFolder &&
+        !isPage &&
+        (isCreatingFileParseTask || isNull(chunkingStatus) || !chunkingStatus ? (
+          canEditResources && (
+            <div
+              className={isCreatingFileParseTask ? undefined : styles.hover}
+              title={t(
+                isSupportedForChunking
+                  ? 'FileManager.actions.chunkingTooltip'
+                  : 'FileManager.actions.chunkingUnsupported',
+              )}
+            >
+              <Button
+                disabled={!isSupportedForChunking}
+                icon={FileBoxIcon}
+                loading={isCreatingFileParseTask}
+                size={'small'}
+                type={'text'}
+                onClick={() => {
+                  parseFiles([id]);
+                }}
+              >
+                {t(
+                  isCreatingFileParseTask
+                    ? 'FileManager.actions.createChunkingTask'
+                    : 'FileManager.actions.chunking',
+                )}
+              </Button>
+            </div>
+          )
+        ) : (
+          <div style={{ cursor: 'default' }}>
+            <ChunksBadge
+              chunkCount={chunkCount}
+              chunkingError={chunkingError}
+              chunkingStatus={chunkingStatus as any}
+              embeddingError={embeddingError}
+              embeddingStatus={embeddingStatus as any}
+              finishEmbedding={finishEmbedding}
+              id={id}
+            />
+          </div>
+        ))}
+      <DropdownMenu className={styles.hover} items={menuItems} />
+    </Flexbox>
+  );
+};
 
 export default FileListItemActions;

@@ -55,10 +55,6 @@ export const MultipleProvidersModelItem = memo<MultipleProvidersModelItemProps>(
 
     const activeProvider = data.providers.find((p) => menuKey(p.id, data.model.id) === activeKey);
     const isActive = !!activeProvider;
-    const defaultProvider = data.providers[0];
-    const defaultProviderRestricted = Boolean(
-      defaultProvider && isModelRestricted?.(data.model.id, defaultProvider.id),
-    );
 
     const allRestricted =
       isModelRestricted &&
@@ -77,17 +73,13 @@ export const MultipleProvidersModelItem = memo<MultipleProvidersModelItemProps>(
           className={cx(menuSharedStyles.item, isActive && styles.menuItemActive)}
           style={{ paddingBlock: 8, paddingInline: 8 }}
           onClick={() => {
-            if (defaultProviderRestricted) {
+            if (allRestricted) {
               onRestrictedModelClick?.();
               onClose();
               return;
             }
-            if (!defaultProvider) {
-              onClose();
-              return;
-            }
             setSubmenuOpen(false);
-            onModelChange(data.model.id, defaultProvider.id);
+            onModelChange(data.model.id, data.providers[0].id);
             onClose();
           }}
         >
@@ -95,7 +87,7 @@ export const MultipleProvidersModelItem = memo<MultipleProvidersModelItemProps>(
             {...data.model}
             {...data.model.abilities}
             newBadgeLabel={newLabel}
-            proBadgeLabel={defaultProviderRestricted ? proLabel : undefined}
+            proBadgeLabel={allRestricted ? proLabel : undefined}
             showInfoTag={showInfoTag}
           />
         </DropdownMenuSubmenuTrigger>

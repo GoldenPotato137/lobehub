@@ -7,6 +7,8 @@
   "features.gatewayMode.title": "Esecuzione dell’Agente Lato Server (Gateway)",
   "features.groupChat.desc": "Abilita il coordinamento della chat di gruppo con più agenti.",
   "features.groupChat.title": "Chat di Gruppo (Multi-Agente)",
+  "features.heterogeneousAgent.desc": "Abilita l’esecuzione eterogenea degli agenti con Claude Code, Codex CLI e altre CLI di agenti esterni. Crea un’opzione \"Agente Claude Code\" nel menu laterale degli agenti.",
+  "features.heterogeneousAgent.title": "Agente eterogeneo (Claude Code)",
   "features.inputMarkdown.desc": "Visualizza in tempo reale il Markdown nell'area di input (testo in grassetto, blocchi di codice, tabelle, ecc.).",
   "features.inputMarkdown.title": "Rendering Markdown in Input",
   "features.messenger.desc": "Parla con i tuoi agenti tramite Telegram (e altri messenger) attraverso il bot condiviso di LobeHub. Aggiunge una scheda Messenger nelle Impostazioni per collegare il tuo account e scegliere quale agente riceve i messaggi.",

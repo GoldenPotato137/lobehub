@@ -2,18 +2,16 @@ import type { FollowUpChip } from '@lobechat/types';
 
 export type FollowUpActionStatus = 'idle' | 'loading' | 'ready';
 
-/** Per-conversation slot — concurrent surfaces (inbox, popup, thread) own their own slot. */
-export interface FollowUpActionSlot {
+export interface FollowUpActionState {
   abortController?: AbortController;
   chips: FollowUpChip[];
   messageId?: string;
+  pendingTopicId?: string;
   status: FollowUpActionStatus;
-}
-
-export interface FollowUpActionState {
-  slots: Record<string, FollowUpActionSlot>;
+  topicId?: string;
 }
 
 export const initialFollowUpActionState: FollowUpActionState = {
-  slots: {},
+  chips: [],
+  status: 'idle',
 };

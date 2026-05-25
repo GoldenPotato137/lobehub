@@ -8,7 +8,6 @@ const GithubCopilot: ModelProviderCard = {
   name: 'GitHub Copilot',
   settings: {
     authType: 'oauthDeviceFlow',
-    maxToolCount: 128,
     oauthDeviceFlow: {
       clientId: 'Iv1.b507a08c87ecfe98',
       defaultPollingInterval: 5,

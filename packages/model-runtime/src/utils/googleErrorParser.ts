@@ -108,11 +108,7 @@ export function parseGoogleErrorMessage(message: string): ParsedError {
   }
 
   const lowerMessage = message.toLowerCase();
-  if (
-    lowerMessage.includes('no image generated') ||
-    lowerMessage.includes('no image data') ||
-    lowerMessage.includes('returned text instead of an image')
-  ) {
+  if (lowerMessage.includes('no image generated') || lowerMessage.includes('no image data')) {
     return { error: { message }, errorType: AgentRuntimeErrorType.ProviderNoImageGenerated };
   }
 

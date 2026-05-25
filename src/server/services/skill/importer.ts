@@ -30,8 +30,8 @@ export class SkillImporter {
   private github: GitHub;
   private userId: string;
 
-  constructor(db: LobeChatDatabase, userId: string) {
-    this.skillModel = new AgentSkillModel(db, userId);
+  constructor(db: LobeChatDatabase, userId: string, workspaceId?: string) {
+    this.skillModel = new AgentSkillModel(db, userId, workspaceId);
     this.parser = new SkillParser();
     this.resourceService = new SkillResourceService(db, userId);
     this.fileService = new FileService(db, userId);

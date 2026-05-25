@@ -23,7 +23,7 @@
   "brief.agentSignal.selfReview.proposal.heading": "Suggestion",
   "brief.agentSignal.selfReview.proposal.summary": "{{count}} suggestion de rêve nécessite votre révision.",
   "brief.agentSignal.selfReview.proposal.summary_plural": "{{count}} suggestions de rêve nécessitent votre révision.",
-  "brief.agentSignal.selfReview.proposal.title": "Suggestion de rêve à réviser",
+  "brief.agentSignal.selfReview.proposal.title": "La suggestion de rêve nécessite une révision",
   "brief.collapse": "Afficher moins",
   "brief.commentPlaceholder": "Partagez votre retour...",
   "brief.commentSubmit": "Envoyer le retour",

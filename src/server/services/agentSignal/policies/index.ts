@@ -7,8 +7,6 @@ import type {
 } from './analyzeIntent/actions';
 import type { CreateFeedbackDomainJudgePolicyOptions } from './analyzeIntent/feedbackDomain';
 import type { CreateFeedbackSatisfactionJudgePolicyOptions } from './analyzeIntent/feedbackSatisfaction';
-import type { CreateCompletionPolicyOptions } from './completionPolicy';
-import { createCompletionPolicy } from './completionPolicy';
 import type { CreateReviewNightlyPolicyOptions } from './reviewNightly';
 import { createReviewNightlyPolicy } from './reviewNightly';
 
@@ -19,14 +17,11 @@ export * from './analyzeIntent/feedbackAction';
 export * from './analyzeIntent/feedbackDomain';
 export * from './analyzeIntent/feedbackDomainAgent';
 export * from './analyzeIntent/feedbackSatisfaction';
-export * from './completionPolicy';
 export * from './reviewNightly';
 export * from './types';
 
 export interface CreateDefaultAgentSignalPoliciesOptions extends CreateFeedbackDomainJudgePolicyOptions {
   classifierDiagnostics?: CreateAnalyzeIntentPolicyOptions['classifierDiagnostics'];
-  /** Optional callbacks invoked after agent.execution.completed for builtin self-iteration agents. */
-  completion?: CreateCompletionPolicyOptions;
   feedbackSatisfactionJudge?: CreateFeedbackSatisfactionJudgePolicyOptions;
   nightlyReview?: CreateReviewNightlyPolicyOptions['nightlyReview'];
   procedure?: CreateAnalyzeIntentPolicyOptions['procedure'];
@@ -49,7 +44,6 @@ const DEFAULT_AGENT_SIGNAL_POLICY_FACTORIES: DefaultAgentSignalPolicyFactory[] =
       selfFeedbackIntent: options.selfFeedbackIntent,
       selfReflection: options.selfReflection,
     }),
-  (options) => [createCompletionPolicy(options.completion ?? {})],
 ];
 
 /**

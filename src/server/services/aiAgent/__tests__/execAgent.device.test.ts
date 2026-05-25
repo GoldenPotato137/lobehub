@@ -263,14 +263,7 @@ describe('AiAgentService.execAgent - device auto-activation', () => {
   });
 
   describe('Web UI scenario (no botContext/discordContext)', () => {
-    // regular chat used to leave activeDeviceId undefined when no
-    // device was bound, which caused the local-system system prompt's
-    // {{workingDirectory}} / {{hostname}} placeholders to reach the LLM as
-    // literals. The model would then waste the first N steps groping for cwd.
-    // Now we auto-activate when exactly one device is online — multi-device
-    // users still need to bind explicitly, since picking one by recency
-    // would be a guess that could route tool calls to the wrong machine.
-    it('should auto-activate the only online device', async () => {
+    it('should NOT auto-activate even with one device online', async () => {
       mockDeviceProxy.isConfigured = true;
       mockDeviceProxy.queryDeviceList.mockResolvedValue([onlineDevice]);
 
@@ -280,32 +273,6 @@ describe('AiAgentService.execAgent - device auto-activation', () => {
       });
 
       expect(mockCreateOperation).toHaveBeenCalled();
-      const createOpArgs = mockCreateOperation.mock.calls[0][0];
-      expect(createOpArgs.activeDeviceId).toBe('device-001');
-    });
-
-    it('should NOT auto-activate when multiple devices are online', async () => {
-      mockDeviceProxy.isConfigured = true;
-      mockDeviceProxy.queryDeviceList.mockResolvedValue([onlineDevice, onlineDevice2]);
-
-      await service.execAgent({
-        agentId: 'agent-1',
-        prompt: 'List my files',
-      });
-
-      const createOpArgs = mockCreateOperation.mock.calls[0][0];
-      expect(createOpArgs.activeDeviceId).toBeUndefined();
-    });
-
-    it('should NOT auto-activate when no devices are online', async () => {
-      mockDeviceProxy.isConfigured = true;
-      mockDeviceProxy.queryDeviceList.mockResolvedValue([]);
-
-      await service.execAgent({
-        agentId: 'agent-1',
-        prompt: 'List my files',
-      });
-
       const createOpArgs = mockCreateOperation.mock.calls[0][0];
       expect(createOpArgs.activeDeviceId).toBeUndefined();
     });
@@ -424,15 +391,9 @@ describe('AiAgentService.execAgent - device auto-activation', () => {
       );
     });
 
-    // Verifies topic-stored metadata.boundDeviceId is NOT silently reused as
-    // the runtime bound device. Setup: topic.metadata says device-002, but the
-    // only online device is device-001. If the topic metadata were reused as
-    // boundDeviceId, activeDeviceId would be undefined (device-002 is offline).
-    // After auto-activate, we instead pick the most-recent online
-    // device (device-001) — proving the topic's stale metadata wasn't honored.
     it('should not reuse topic boundDeviceId when no explicit deviceId is provided', async () => {
       mockDeviceProxy.isConfigured = true;
-      mockDeviceProxy.queryDeviceList.mockResolvedValue([onlineDevice]);
+      mockDeviceProxy.queryDeviceList.mockResolvedValue([onlineDevice, onlineDevice2]);
       topicMock.findById.mockResolvedValue({ metadata: { boundDeviceId: 'device-002' } });
       const { AgentService } = await import('@/server/services/agent');
       vi.mocked(AgentService).mockImplementation(
@@ -460,8 +421,7 @@ describe('AiAgentService.execAgent - device auto-activation', () => {
       });
 
       const createOpArgs = mockCreateOperation.mock.calls[0][0];
-      expect(createOpArgs.activeDeviceId).not.toBe('device-002');
-      expect(createOpArgs.activeDeviceId).toBe('device-001');
+      expect(createOpArgs.activeDeviceId).toBeUndefined();
     });
 
     it('should keep explicit topic binding when the bound device is offline', async () => {
@@ -527,18 +487,12 @@ describe('AiAgentService.execAgent - device auto-activation', () => {
       expect(createOpArgs.activeDeviceId).toBe('device-001');
     });
 
-    // Mirrors the "should not reuse topic boundDeviceId" test above with a
-    // different mock shape. Topic metadata stores device-002, but only
-    // device-001 is online; if topic metadata leaked into boundDeviceId,
-    // activeDeviceId would be undefined (since device-002 is offline). The
-    // post-auto-activate picks device-001 instead, confirming the
-    // stale topic.metadata.boundDeviceId path is dead.
     it('should not reuse topic metadata bound device when no deviceId is supplied', async () => {
       mockDeviceProxy.isConfigured = true;
       mockDeviceProxy.queryDeviceList.mockResolvedValue([onlineDevice]);
       topicMock.findById.mockResolvedValue({
         id: 'topic-1',
-        metadata: { boundDeviceId: 'device-002' },
+        metadata: { boundDeviceId: 'device-001' },
       });
 
       await service.execAgent({
@@ -548,8 +502,7 @@ describe('AiAgentService.execAgent - device auto-activation', () => {
       });
 
       const createOpArgs = mockCreateOperation.mock.calls[0][0];
-      expect(createOpArgs.activeDeviceId).not.toBe('device-002');
-      expect(createOpArgs.activeDeviceId).toBe('device-001');
+      expect(createOpArgs.activeDeviceId).toBeUndefined();
     });
 
     it('should not update topic metadata when a new deviceId is provided for existing topic', async () => {

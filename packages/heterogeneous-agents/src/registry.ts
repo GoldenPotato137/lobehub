@@ -1,25 +1,28 @@
 /**
  * Agent Adapter Registry
  *
- * Maps agent type keys to their adapter constructors. New agents are added
- * by registering here — no other code changes needed.
+ * Maps agent type keys to their adapter constructors and CLI presets.
+ * New agents are added by registering here — no other code changes needed.
  */
 
-import { ClaudeCodeAdapter, CodexAdapter } from './adapters';
-import type { AgentEventAdapter } from './types';
+import { ClaudeCodeAdapter, claudeCodePreset, CodexAdapter, codexPreset } from './adapters';
+import type { AgentCLIPreset, AgentEventAdapter } from './types';
 
 interface AgentRegistryEntry {
   createAdapter: () => AgentEventAdapter;
+  preset: AgentCLIPreset;
 }
 
 const registry: Record<string, AgentRegistryEntry> = {
   'claude-code': {
     createAdapter: () => new ClaudeCodeAdapter(),
+    preset: claudeCodePreset,
   },
   'codex': {
     createAdapter: () => new CodexAdapter(),
+    preset: codexPreset,
   },
-  // 'kimi-cli': { createAdapter: () => new KimiCLIAdapter() },
+  // 'kimi-cli': { createAdapter: () => new KimiCLIAdapter(), preset: kimiPreset },
 };
 
 /**
@@ -33,6 +36,19 @@ export const createAdapter = (agentType: string): AgentEventAdapter => {
     );
   }
   return entry.createAdapter();
+};
+
+/**
+ * Get the CLI preset for the given agent type.
+ */
+export const getPreset = (agentType: string): AgentCLIPreset => {
+  const entry = registry[agentType];
+  if (!entry) {
+    throw new Error(
+      `Unknown agent type: "${agentType}". Available: ${Object.keys(registry).join(', ')}`,
+    );
+  }
+  return entry.preset;
 };
 
 /**

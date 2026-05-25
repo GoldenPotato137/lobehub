@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 import SkillSourceTag from '@/components/SkillSourceTag';
 import { createBuiltinSkillDetailModal } from '@/features/SkillStore/SkillDetail';
+import { usePermission } from '@/hooks/usePermission';
 import { useToolStore } from '@/store/tool';
 import { builtinToolSelectors } from '@/store/tool/selectors';
 
@@ -22,6 +23,8 @@ interface BuiltinSkillItemProps {
 const BuiltinSkillItem = memo<BuiltinSkillItemProps>(({ identifier, title, avatar }) => {
   const { t } = useTranslation(['setting', 'plugin']);
   const { modal } = App.useApp();
+  const { allowed: canCreate } = usePermission('create_content');
+  const { allowed: canEdit } = usePermission('edit_own_content');
 
   const [installBuiltinTool, uninstallBuiltinTool, isInstalled] = useToolStore((s) => [
     s.installBuiltinTool,
@@ -30,10 +33,13 @@ const BuiltinSkillItem = memo<BuiltinSkillItemProps>(({ identifier, title, avata
   ]);
 
   const handleInstall = async () => {
+    if (!canCreate) return;
     await installBuiltinTool(identifier);
   };
 
   const handleUninstall = () => {
+    if (!canEdit) return;
+
     modal.confirm({
       centered: true,
       okButtonProps: { danger: true },
@@ -66,6 +72,7 @@ const BuiltinSkillItem = memo<BuiltinSkillItemProps>(({ identifier, title, avata
           items={[
             {
               danger: true,
+              disabled: !canEdit,
               icon: <Icon icon={Trash2} />,
               key: 'uninstall',
               label: t('store.actions.uninstall', { ns: 'plugin' }),
@@ -73,13 +80,13 @@ const BuiltinSkillItem = memo<BuiltinSkillItemProps>(({ identifier, title, avata
             },
           ]}
         >
-          <Button icon={MoreHorizontalIcon} />
+          <Button disabled={!canEdit} icon={MoreHorizontalIcon} />
         </DropdownMenu>
       );
     }
 
     return (
-      <Button icon={Plus} onClick={handleInstall}>
+      <Button disabled={!canCreate} icon={Plus} onClick={handleInstall}>
         {t('store.actions.install', { ns: 'plugin' })}
       </Button>
     );

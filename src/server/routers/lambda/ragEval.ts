@@ -15,6 +15,7 @@ import JSONL from 'jsonl-parse-stringify';
 import pMap from 'p-map';
 import { z } from 'zod';
 
+import { withScopedPermission } from '@/business/server/trpc-middlewares/rbacPermission';
 import { DEFAULT_EMBEDDING_MODEL, DEFAULT_MODEL } from '@/const/settings';
 import { FileModel } from '@/database/models/file';
 import {
@@ -30,21 +31,23 @@ import { FileService } from '@/server/services/file';
 
 const ragEvalProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
   const { ctx } = opts;
+  const wsId = ctx.workspaceId ?? undefined;
 
   return opts.next({
     ctx: {
-      datasetModel: new EvalDatasetModel(ctx.serverDB, ctx.userId),
-      fileModel: new FileModel(ctx.serverDB, ctx.userId),
-      datasetRecordModel: new EvalDatasetRecordModel(ctx.serverDB, ctx.userId),
-      evaluationModel: new EvalEvaluationModel(ctx.serverDB, ctx.userId),
-      evaluationRecordModel: new EvaluationRecordModel(ctx.serverDB, ctx.userId),
+      datasetModel: new EvalDatasetModel(ctx.serverDB, ctx.userId, wsId),
+      fileModel: new FileModel(ctx.serverDB, ctx.userId, wsId),
+      datasetRecordModel: new EvalDatasetRecordModel(ctx.serverDB, ctx.userId, wsId),
+      evaluationModel: new EvalEvaluationModel(ctx.serverDB, ctx.userId, wsId),
+      evaluationRecordModel: new EvaluationRecordModel(ctx.serverDB, ctx.userId, wsId),
       fileService: new FileService(ctx.serverDB, ctx.userId),
     },
   });
 });
+const ragEvalWriteProcedure = ragEvalProcedure.use(withScopedPermission('knowledge_base:update'));
 
 export const ragEvalRouter = router({
-  createDataset: ragEvalProcedure
+  createDataset: ragEvalWriteProcedure
     .input(
       z.object({
         description: z.string().optional(),
@@ -69,13 +72,13 @@ export const ragEvalRouter = router({
       return ctx.datasetModel.query(input.knowledgeBaseId);
     }),
 
-  removeDataset: ragEvalProcedure
+  removeDataset: ragEvalWriteProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
       return ctx.datasetModel.delete(input.id);
     }),
 
-  updateDataset: ragEvalProcedure
+  updateDataset: ragEvalWriteProcedure
     .input(
       z.object({
         id: z.string(),
@@ -87,7 +90,7 @@ export const ragEvalRouter = router({
     }),
 
   // Dataset Item operations
-  createDatasetRecords: ragEvalProcedure
+  createDatasetRecords: ragEvalWriteProcedure
     .input(
       z.object({
         datasetId: z.string(),
@@ -108,13 +111,13 @@ export const ragEvalRouter = router({
       return ctx.datasetRecordModel.query(input.datasetId);
     }),
 
-  removeDatasetRecords: ragEvalProcedure
+  removeDatasetRecords: ragEvalWriteProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
       return ctx.datasetRecordModel.delete(input.id);
     }),
 
-  updateDatasetRecords: ragEvalProcedure
+  updateDatasetRecords: ragEvalWriteProcedure
     .input(
       z.object({
         id: z.string(),
@@ -132,7 +135,7 @@ export const ragEvalRouter = router({
       return ctx.datasetRecordModel.update(input.id, input.value);
     }),
 
-  importDatasetRecords: ragEvalProcedure
+  importDatasetRecords: ragEvalWriteProcedure
     .input(
       z.object({
         datasetId: z.string(),
@@ -170,7 +173,7 @@ export const ragEvalRouter = router({
     }),
 
   // Evaluation operations
-  startEvaluationTask: ragEvalProcedure
+  startEvaluationTask: ragEvalWriteProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
       // Start evaluation task
@@ -272,7 +275,7 @@ export const ragEvalRouter = router({
 
       return { success: isSuccess };
     }),
-  createEvaluation: ragEvalProcedure
+  createEvaluation: ragEvalWriteProcedure
     .input(insertEvalEvaluationSchema)
     .mutation(async ({ input, ctx }) => {
       const data = await ctx.evaluationModel.create({
@@ -285,7 +288,7 @@ export const ragEvalRouter = router({
       return data?.id;
     }),
 
-  removeEvaluation: ragEvalProcedure
+  removeEvaluation: ragEvalWriteProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
       return ctx.evaluationModel.delete(input.id);

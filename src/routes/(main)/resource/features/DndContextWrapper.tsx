@@ -10,6 +10,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 import FileIcon from '@/components/FileIcon';
+import { usePermission } from '@/hooks/usePermission';
 import { useTreeStore } from '@/store/tree';
 
 import { useResourceManagerStore } from './store';
@@ -73,6 +74,7 @@ export const useSetCurrentDrag = () => {
 export const DndContextWrapper = memo<PropsWithChildren>(({ children }) => {
   const { t } = useTranslation('components');
   const { message } = App.useApp();
+  const { allowed: canEditResources } = usePermission('edit_own_content');
   const [currentDrag, setCurrentDrag] = useState<DragState | null>(null);
   const currentDragRef = useRef<DragState | null>(null);
   currentDragRef.current = currentDrag;
@@ -108,6 +110,10 @@ export const DndContextWrapper = memo<PropsWithChildren>(({ children }) => {
 
       const drag = currentDragRef.current;
       if (!drag) return;
+      if (!canEditResources) {
+        setCurrentDrag(null);
+        return;
+      }
 
       let dropTarget = event.target as HTMLElement;
       let targetId: string | undefined;
@@ -189,7 +195,7 @@ export const DndContextWrapper = memo<PropsWithChildren>(({ children }) => {
       document.removeEventListener('dragover', handleDragOver);
       document.removeEventListener('dragend', handleDragEnd);
     };
-  }, [setCurrentDrag, setSelectedFileIds, message, t]);
+  }, [canEditResources, setCurrentDrag, setSelectedFileIds, message, t]);
 
   const appElement = useAppElement();
 

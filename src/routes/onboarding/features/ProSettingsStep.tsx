@@ -1,32 +1,49 @@
 'use client';
 
-import { Button, Flexbox } from '@lobehub/ui';
+import { Button, Flexbox, Text } from '@lobehub/ui';
 import { cssVar } from 'antd-style';
 import { Undo2Icon } from 'lucide-react';
 import { memo, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import ModelSelect from '@/features/ModelSelect';
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
 import LobeMessage from '@/routes/onboarding/components/LobeMessage';
+import { serverConfigSelectors, useServerConfigStore } from '@/store/serverConfig';
+import { useUserStore } from '@/store/user';
+import { settingsSelectors } from '@/store/user/selectors';
 
 import KlavisServerList from '../components/KlavisServerList';
 
 interface ProSettingsStepProps {
   onBack: () => void;
-  onNext: () => void;
 }
 
-const ProSettingsStep = memo<ProSettingsStepProps>(({ onBack, onNext }) => {
+const ProSettingsStep = memo<ProSettingsStepProps>(({ onBack }) => {
   const { t } = useTranslation('onboarding');
+  const navigate = useWorkspaceAwareNavigate();
+
+  const enableKlavis = useServerConfigStore(serverConfigSelectors.enableKlavis);
+
+  const [updateDefaultModel, finishOnboarding] = useUserStore((s) => [
+    s.updateDefaultModel,
+    s.finishOnboarding,
+  ]);
+
+  const defaultAgentConfig = useUserStore(
+    (s) => settingsSelectors.currentSettings(s).defaultAgent?.config,
+  );
 
   const [isNavigating, setIsNavigating] = useState(false);
   const isNavigatingRef = useRef(false);
 
-  const handleNext = useCallback(() => {
+  const handleFinish = useCallback(async () => {
     if (isNavigatingRef.current) return;
     isNavigatingRef.current = true;
     setIsNavigating(true);
-    onNext();
-  }, [onNext]);
+    await finishOnboarding();
+    navigate('/');
+  }, [finishOnboarding, navigate]);
 
   const handleBack = useCallback(() => {
     if (isNavigatingRef.current) return;
@@ -35,11 +52,35 @@ const ProSettingsStep = memo<ProSettingsStepProps>(({ onBack, onNext }) => {
     onBack();
   }, [onBack]);
 
+  const handleModelChange = useCallback(
+    ({ model, provider }: { model: string; provider: string }) => {
+      updateDefaultModel(model, provider);
+    },
+    [updateDefaultModel],
+  );
+
   return (
     <Flexbox gap={16}>
-      <LobeMessage sentences={[t('proSettings.connectors.title')]} />
+      <LobeMessage
+        sentences={[t('proSettings.title'), t('proSettings.title2'), t('proSettings.title3')]}
+      />
+      <Flexbox gap={16}>
+        <Text color={cssVar.colorTextSecondary}>{t('proSettings.model.title')}</Text>
+        <ModelSelect
+          showAbility={false}
+          size="large"
+          style={{ width: '100%' }}
+          value={defaultAgentConfig}
+          onChange={handleModelChange}
+        />
+      </Flexbox>
 
-      <KlavisServerList />
+      {enableKlavis && (
+        <Flexbox gap={16}>
+          <Text color={cssVar.colorTextSecondary}>{t('proSettings.connectors.title')}</Text>
+          <KlavisServerList />
+        </Flexbox>
+      )}
 
       <Flexbox horizontal align={'center'} justify={'space-between'} style={{ marginTop: 16 }}>
         <Button
@@ -57,9 +98,9 @@ const ProSettingsStep = memo<ProSettingsStepProps>(({ onBack, onNext }) => {
           disabled={isNavigating}
           style={{ minWidth: 120 }}
           type="primary"
-          onClick={handleNext}
+          onClick={() => void handleFinish()}
         >
-          {t('next')}
+          {t('finish')}
         </Button>
       </Flexbox>
     </Flexbox>

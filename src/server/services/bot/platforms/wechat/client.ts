@@ -20,15 +20,12 @@ import {
   type BotPlatformRuntimeContext,
   type BotProviderConfig,
   ClientFactory,
-  type MessengerContent,
-  messengerContentText,
   type PlatformClient,
   type PlatformMessenger,
   type UsageStats,
   type ValidationResult,
 } from '../types';
 import { formatUsageStats } from '../utils';
-import { sendWechatAttachments } from './sendAttachments';
 
 const log = debug('bot-platform:wechat:bot');
 
@@ -395,25 +392,15 @@ class WechatGatewayClient implements PlatformClient {
       return '';
     };
 
-    const sendMessengerContent = async (input: MessengerContent): Promise<void> => {
-      const text = messengerContentText(input);
-      const attachments = typeof input === 'string' ? undefined : input.attachments;
-      const token = await resolveToken();
-      if (text.trim()) {
-        await this.api.sendMessage(targetId, text, token);
-      }
-      if (attachments?.length) {
-        await sendWechatAttachments(this.api, targetId, attachments, token);
-      }
-    };
-
     return {
       createMessage: async (content) => {
-        await sendMessengerContent(content);
+        const token = await resolveToken();
+        await this.api.sendMessage(targetId, content, token);
       },
       editMessage: async (_messageId, content) => {
         // WeChat doesn't support editing — send a new message
-        await sendMessengerContent(content);
+        const token = await resolveToken();
+        await this.api.sendMessage(targetId, content, token);
       },
       removeReaction: () => Promise.resolve(),
       triggerTyping: async () => {

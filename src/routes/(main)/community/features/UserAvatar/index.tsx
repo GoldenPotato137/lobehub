@@ -4,8 +4,8 @@ import { Avatar, Button, Skeleton } from '@lobehub/ui';
 import { UserCircleIcon } from 'lucide-react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
 import { useMarketAuth, useMarketUserProfile } from '@/layout/AuthProvider/MarketAuth';
 import { useServerConfigStore } from '@/store/serverConfig';
 import { serverConfigSelectors } from '@/store/serverConfig/selectors';
@@ -36,7 +36,7 @@ const checkNeedsProfileSetup = (
 
 const UserAvatar = memo(() => {
   const { t } = useTranslation('discover');
-  const navigate = useNavigate();
+  const navigate = useWorkspaceAwareNavigate();
   const [loading, setLoading] = useState(false);
   const { isAuthenticated, isLoading, getCurrentUserInfo, signIn } = useMarketAuth();
 

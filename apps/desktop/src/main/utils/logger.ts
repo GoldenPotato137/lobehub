@@ -1,4 +1,3 @@
-import { setLoggerFactory } from '@lobechat/local-file-shell';
 import debug from 'debug';
 import electronLog from 'electron-log';
 
@@ -47,9 +46,3 @@ export const createLogger = (namespace: string) => {
     },
   };
 };
-
-// Route @lobechat/local-file-shell logs through desktop's electron-log +
-// debug pipeline so search failures from the sunk contentSearch / fileSearch
-// modules land in the same production log file users attach for support
-// (regression introduced when the modules moved out of the desktop tree).
-setLoggerFactory(createLogger);

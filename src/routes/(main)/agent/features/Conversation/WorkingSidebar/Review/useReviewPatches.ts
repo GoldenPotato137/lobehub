@@ -1,8 +1,5 @@
 import { isDesktop } from '@lobechat/const';
-import type {
-  GitWorkingTreePatch,
-  SubmoduleWorkingTreePatches,
-} from '@lobechat/electron-client-ipc';
+import type { GitWorkingTreePatch } from '@lobechat/electron-client-ipc';
 
 import { useClientDataSWR } from '@/libs/swr';
 import { electronGitService } from '@/services/electron/git';
@@ -14,18 +11,11 @@ export interface ReviewPatchesData {
   headRef?: string;
   mode: ReviewMode;
   patches: GitWorkingTreePatch[];
-  /**
-   * Per-submodule patch groups. Undefined when the parent has no dirty
-   * submodules (unstaged) or no submodule pointer differences (branch) — the
-   * Review panel keeps its flat single-repo layout in that case. Branch-mode
-   * groups carry the submodule's own branch diff against its own origin/HEAD.
-   */
-  submodules?: SubmoduleWorkingTreePatches[];
 }
 
 const fetchUnstaged = async (dirPath: string): Promise<ReviewPatchesData> => {
   const result = await electronGitService.getGitWorkingTreePatches(dirPath);
-  return { mode: 'unstaged', patches: result.patches, submodules: result.submodules };
+  return { mode: 'unstaged', patches: result.patches };
 };
 
 const fetchBranch = async (
@@ -38,7 +28,6 @@ const fetchBranch = async (
     headRef: result.headRef,
     mode: 'branch',
     patches: result.patches,
-    submodules: result.submodules,
   };
 };
 

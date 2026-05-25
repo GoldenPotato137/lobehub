@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import ModeSwitch from './ModeSwitch';
 
@@ -23,9 +23,9 @@ vi.mock('react-i18next', () => ({
     t: (key: string) =>
       (
         ({
-          'agent.modeSwitch.agent': 'Conversational setup',
-          'agent.modeSwitch.classic': 'Manual setup',
-          'agent.modeSwitch.label': 'Choose a setup method',
+          'agent.modeSwitch.agent': 'Conversational',
+          'agent.modeSwitch.classic': 'Classic',
+          'agent.modeSwitch.label': 'Choose your onboarding mode',
         }) as Record<string, string>
       )[key] || key,
   }),
@@ -63,13 +63,6 @@ vi.mock('@/store/serverConfig', () => ({
   },
 }));
 
-const localStorageMock = {
-  clear: vi.fn(),
-  getItem: vi.fn(() => null),
-  removeItem: vi.fn(),
-  setItem: vi.fn(),
-};
-
 const renderModeSwitch = ({
   actions,
   AGENT_ONBOARDING_ENABLED = true,
@@ -91,16 +84,8 @@ const renderModeSwitch = ({
   );
 };
 
-beforeEach(() => {
-  Object.defineProperty(window, 'localStorage', {
-    configurable: true,
-    value: localStorageMock,
-  });
-});
-
 afterEach(() => {
   cleanup();
-  vi.clearAllMocks();
   mockConfig.agentOnboardingEnabled = true;
   mockConfig.AGENT_ONBOARDING_ENABLED = true;
   mockConfig.desktop = false;
@@ -118,9 +103,9 @@ describe('ModeSwitch', () => {
     () => {
       renderModeSwitch({ enabled: true, showLabel: true });
 
-      expect(screen.getByText('Choose a setup method')).toBeInTheDocument();
-      expect(screen.getByRole('radio', { name: 'Conversational setup' })).toBeChecked();
-      expect(screen.getByRole('radio', { name: 'Manual setup' })).not.toBeChecked();
+      expect(screen.getByText('Choose your onboarding mode')).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Conversational' })).toBeChecked();
+      expect(screen.getByRole('radio', { name: 'Classic' })).not.toBeChecked();
     },
     TEST_TIMEOUT_MS,
   );
@@ -130,9 +115,9 @@ describe('ModeSwitch', () => {
     () => {
       renderModeSwitch({ enabled: false });
 
-      expect(screen.queryByRole('radio', { name: 'Conversational setup' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('radio', { name: 'Manual setup' })).not.toBeInTheDocument();
-      expect(screen.queryByText('Choose a setup method')).not.toBeInTheDocument();
+      expect(screen.queryByRole('radio', { name: 'Conversational' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('radio', { name: 'Classic' })).not.toBeInTheDocument();
+      expect(screen.queryByText('Choose your onboarding mode')).not.toBeInTheDocument();
     },
     TEST_TIMEOUT_MS,
   );
@@ -140,8 +125,8 @@ describe('ModeSwitch', () => {
   it('hides the onboarding switch until server config is initialized', () => {
     renderModeSwitch({ enabled: true, serverConfigInit: false });
 
-    expect(screen.queryByRole('radio', { name: 'Conversational setup' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('radio', { name: 'Manual setup' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Conversational' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Classic' })).not.toBeInTheDocument();
   });
 
   it('keeps action buttons visible when agent onboarding is disabled', () => {
@@ -151,21 +136,21 @@ describe('ModeSwitch', () => {
     });
 
     expect(screen.getByRole('button', { name: 'Restart' })).toBeInTheDocument();
-    expect(screen.queryByRole('radio', { name: 'Conversational setup' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('radio', { name: 'Manual setup' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Conversational' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Classic' })).not.toBeInTheDocument();
   });
 
   it('does not render the switch on desktop builds', () => {
     renderModeSwitch({ desktop: true, enabled: true });
 
-    expect(screen.queryByRole('radio', { name: 'Conversational setup' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('radio', { name: 'Manual setup' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Conversational' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Classic' })).not.toBeInTheDocument();
   });
 
   it('hides the switch when AGENT_ONBOARDING_ENABLED master switch is off', () => {
     renderModeSwitch({ AGENT_ONBOARDING_ENABLED: false, enabled: true });
 
-    expect(screen.queryByRole('radio', { name: 'Conversational setup' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('radio', { name: 'Manual setup' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Conversational' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Classic' })).not.toBeInTheDocument();
   });
 });

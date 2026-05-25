@@ -7,8 +7,8 @@ import { createStaticStyles } from 'antd-style';
 import { ChevronDown, SquareArrowOutUpRight } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
 import { agentService } from '@/services/agent';
 import { runSelectors, useEvalStore } from '@/store/eval';
 
@@ -65,7 +65,7 @@ const RunCreateModal = memo<RunCreateModalProps>(
   ({ open, onClose, benchmarkId, datasetId, datasetName }) => {
     const { t } = useTranslation('eval');
     const { t: tChat } = useTranslation('chat');
-    const navigate = useNavigate();
+    const navigate = useWorkspaceAwareNavigate();
     const createRun = useEvalStore((s) => s.createRun);
     const startRun = useEvalStore((s) => s.startRun);
     const isCreatingRun = useEvalStore(runSelectors.isCreatingRun);

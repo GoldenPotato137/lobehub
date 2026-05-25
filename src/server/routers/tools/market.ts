@@ -45,6 +45,7 @@ const marketToolProcedure = authedProcedure
           userInfo: ctx.marketUserInfo,
         }),
         userModel,
+        workspaceId: ctx.workspaceId,
       },
     });
   });
@@ -140,7 +141,13 @@ const execInSandboxHandler = async ({
   input,
   ctx,
 }: {
-  ctx: { fileService: FileService; marketService: MarketService; serverDB: any; userId: string };
+  ctx: {
+    fileService: FileService;
+    marketService: MarketService;
+    serverDB: any;
+    userId: string;
+    workspaceId?: string | null;
+  };
   input: ExecInSandboxInput;
 }): Promise<CallToolResult> => {
   const { toolName, params, topicId } = input;
@@ -173,8 +180,9 @@ const execInSandboxHandler = async ({
 
     // For execScript tool, look up skill zipUrls from activatedSkills
     if (toolName === 'execScript' && enhancedParams.activatedSkills?.length) {
-      const agentSkillModel = new AgentSkillModel(ctx.serverDB, userId);
-      const fileModel = new FileModel(ctx.serverDB, userId);
+      const wsId = ctx.workspaceId ?? undefined;
+      const agentSkillModel = new AgentSkillModel(ctx.serverDB, userId, wsId);
+      const fileModel = new FileModel(ctx.serverDB, userId, wsId);
 
       // Resolve zipUrls for all activated skills
       const skillZipUrls: Record<string, string> = {};

@@ -113,7 +113,9 @@ export const useNavLayout = (): NavLayout => {
   const userPanel = useMemo(
     () => ({
       showDataImporter: false,
-      showMemory: true,
+      // Memory now appears in the sidebar by default; drop the duplicate entry
+      // from the user dropdown to keep that menu focused on account / settings.
+      showMemory: false,
     }),
     [],
   );

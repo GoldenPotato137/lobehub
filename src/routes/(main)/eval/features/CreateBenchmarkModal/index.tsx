@@ -4,8 +4,8 @@ import { Input, Modal, type ModalProps, Select, TextArea } from '@lobehub/ui';
 import { App, Form } from 'antd';
 import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
 import { useEvalStore } from '@/store/eval';
 
 const toIdentifier = (name: string) =>
@@ -20,7 +20,7 @@ interface CreateBenchmarkModalProps extends ModalProps {}
 const CreateBenchmarkModal = memo<CreateBenchmarkModalProps>(({ open, onCancel }) => {
   const { t } = useTranslation('eval');
   const { message } = App.useApp();
-  const navigate = useNavigate();
+  const navigate = useWorkspaceAwareNavigate();
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [identifierTouched, setIdentifierTouched] = useState(false);

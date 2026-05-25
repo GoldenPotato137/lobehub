@@ -1,4 +1,4 @@
-import { isNotNull } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import {
   boolean,
@@ -21,26 +21,9 @@ import { idGenerator, randomSlug } from '../utils/idGenerator';
 import { accessedAt, createdAt, timestamps } from './_helpers';
 import { asyncTasks } from './asyncTask';
 import { users } from './user';
+import { workspaces } from './workspace';
 
 export const DOCUMENT_FOLDER_TYPE = 'custom/folder';
-
-/** File type used by the parent document for a managed skill bundle. */
-export const SKILL_BUNDLE_FILE_TYPE = 'skills/bundle';
-
-/** File type used by the SKILL.md index document inside a managed skill bundle. */
-export const SKILL_INDEX_FILE_TYPE = 'skills/index';
-
-/** Source attribution stored on documents created by skill-management tooling. */
-export const SKILL_MANAGEMENT_SOURCE = 'agent-signal:skill-management';
-
-/** Source type stored on documents created by Agent Signal skill-management tooling. */
-export const SKILL_MANAGEMENT_SOURCE_TYPE = 'agent-signal';
-
-/** Canonical filename for a skill index document. */
-export const SKILL_INDEX_FILENAME = 'SKILL.md';
-
-/** Template id applied to agent document bindings that represent managed skills. */
-export const AGENT_SKILL_TEMPLATE_ID = 'agent-skill';
 
 export const globalFiles = pgTable(
   'global_files',
@@ -121,6 +104,8 @@ export const documents = pgTable(
 
     slug: varchar('slug', { length: 255 }).$defaultFn(() => randomSlug(3)),
 
+    workspaceId: text('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }),
+
     // Timestamps
     ...timestamps,
   },
@@ -133,9 +118,16 @@ export const documents = pgTable(
     index('documents_parent_id_idx').on(table.parentId),
     index('documents_knowledge_base_id_idx').on(table.knowledgeBaseId),
     uniqueIndex('documents_client_id_user_id_unique').on(table.clientId, table.userId),
+    // Personal mode: per-user slug uniqueness. Without `workspace_id IS NULL`
+    // a personal slug blocks creating the same slug inside any workspace.
     uniqueIndex('documents_slug_user_id_unique')
       .on(table.slug, table.userId)
-      .where(isNotNull(table.slug)),
+      .where(sql`${table.workspaceId} IS NULL AND ${table.slug} IS NOT NULL`),
+    // Workspace mode: slug unique within a workspace.
+    uniqueIndex('documents_slug_workspace_id_unique')
+      .on(table.workspaceId, table.slug)
+      .where(sql`${table.workspaceId} IS NOT NULL AND ${table.slug} IS NOT NULL`),
+    index('documents_workspace_id_idx').on(table.workspaceId),
   ],
 );
 
@@ -180,6 +172,8 @@ export const files = pgTable(
       onDelete: 'set null',
     }),
 
+    workspaceId: text('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }),
+
     ...timestamps,
   },
   (table) => {
@@ -193,6 +187,7 @@ export const files = pgTable(
         table.clientId,
         table.userId,
       ),
+      workspaceIdIdx: index('files_workspace_id_idx').on(table.workspaceId),
     };
   },
 );
@@ -221,11 +216,14 @@ export const knowledgeBases = pgTable(
 
     settings: jsonb('settings'),
 
+    workspaceId: text('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }),
+
     ...timestamps,
   },
   (t) => [
     uniqueIndex('knowledge_bases_client_id_user_id_unique').on(t.clientId, t.userId),
     index('knowledge_bases_user_id_idx').on(t.userId),
+    index('knowledge_bases_workspace_id_idx').on(t.workspaceId),
   ],
 );
 
@@ -248,6 +246,7 @@ export const knowledgeBaseFiles = pgTable(
     userId: text('user_id')
       .references(() => users.id, { onDelete: 'cascade' })
       .notNull(),
+    workspaceId: text('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }),
 
     createdAt: createdAt(),
   },
@@ -256,5 +255,6 @@ export const knowledgeBaseFiles = pgTable(
     index('knowledge_base_files_kb_id_idx').on(t.knowledgeBaseId),
     index('knowledge_base_files_user_id_idx').on(t.userId),
     index('knowledge_base_files_file_id_idx').on(t.fileId),
+    index('knowledge_base_files_workspace_id_idx').on(t.workspaceId),
   ],
 );

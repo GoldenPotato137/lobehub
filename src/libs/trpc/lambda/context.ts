@@ -74,6 +74,7 @@ export interface AuthContext {
   traceContext?: OtContext;
   userAgent?: string;
   userId?: string | null;
+  workspaceId?: string | null;
 }
 
 /**
@@ -87,6 +88,7 @@ export const createContextInner = async (params?: {
   traceContext?: OtContext;
   userAgent?: string;
   userId?: string | null;
+  workspaceId?: string | null;
 }): Promise<AuthContext> => {
   log('createContextInner called with params: %O', params);
   const responseHeaders = new Headers();
@@ -99,6 +101,7 @@ export const createContextInner = async (params?: {
     traceContext: params?.traceContext,
     userAgent: params?.userAgent,
     userId: params?.userId,
+    workspaceId: params?.workspaceId,
   };
 };
 
@@ -134,10 +137,13 @@ export const createLambdaContext = async (request: NextRequest): Promise<LambdaC
   const traceContext = extractTraceContext(request.headers);
 
   log('marketAccessToken from cookie:', marketAccessToken ? '[HIDDEN]' : 'undefined');
+  const workspaceId = request.headers.get('X-Workspace-Id')?.trim() || undefined;
+
   const commonContext = {
     clientIp,
     marketAccessToken,
     userAgent,
+    workspaceId,
   };
 
   const apiKeyToken = request.headers.get(LOBE_CHAT_API_KEY_HEADER)?.trim();

@@ -41,7 +41,6 @@ const StreamingMarkdown = memo<StreamingMarkdownProps>(({ children, maxHeight = 
 
   return (
     <ScrollArea
-      disableContentFit
       scrollFade
       className={styles.scrollRoot}
       contentProps={{

@@ -20,6 +20,7 @@ const styles = createStaticStyles(({ css }) => ({
 }));
 
 interface FileCredFormProps {
+  disabled?: boolean;
   onBack: () => void;
   onSuccess: () => void;
 }
@@ -30,7 +31,7 @@ interface FormValues {
   name: string;
 }
 
-const FileCredForm: FC<FileCredFormProps> = ({ onBack, onSuccess }) => {
+const FileCredForm: FC<FileCredFormProps> = ({ disabled, onBack, onSuccess }) => {
   const { t } = useTranslation('setting');
   const [form] = Form.useForm<FormValues>();
   const [fileHashId, setFileHashId] = useState<string | null>(null);
@@ -38,12 +39,14 @@ const FileCredForm: FC<FileCredFormProps> = ({ onBack, onSuccess }) => {
   const [isUploading, setIsUploading] = useState(false);
 
   const createMutation = useMutation({
-    mutationFn: (values: FormValues) => {
+    mutationFn: async (values: FormValues) => {
+      if (disabled) return;
+
       if (!fileHashId || !fileName) {
         throw new Error('File is required');
       }
 
-      return lambdaClient.market.creds.createFile.mutate({
+      await lambdaClient.market.creds.createFile.mutate({
         description: values.description,
         fileHashId,
         fileName,
@@ -57,6 +60,8 @@ const FileCredForm: FC<FileCredFormProps> = ({ onBack, onSuccess }) => {
   });
 
   const handleUpload = async (file: File) => {
+    if (disabled) return false;
+
     setIsUploading(true);
 
     try {
@@ -90,6 +95,8 @@ const FileCredForm: FC<FileCredFormProps> = ({ onBack, onSuccess }) => {
   };
 
   const handleSubmit = (values: FormValues) => {
+    if (disabled) return;
+
     if (!fileHashId) {
       message.error(t('creds.form.fileRequired'));
       return;
@@ -102,7 +109,7 @@ const FileCredForm: FC<FileCredFormProps> = ({ onBack, onSuccess }) => {
       <Form.Item required label={t('creds.form.file')}>
         <Upload.Dragger
           beforeUpload={handleUpload}
-          disabled={isUploading}
+          disabled={isUploading || disabled}
           maxCount={1}
           showUploadList={fileName ? { showRemoveIcon: true } : false}
           onRemove={() => {
@@ -133,7 +140,7 @@ const FileCredForm: FC<FileCredFormProps> = ({ onBack, onSuccess }) => {
           { pattern: /^[\w-]+$/, message: t('creds.form.keyPattern') },
         ]}
       >
-        <Input placeholder="e.g., gcp-service-account" />
+        <Input disabled={disabled} placeholder="e.g., gcp-service-account" />
       </Form.Item>
 
       <Form.Item
@@ -141,17 +148,21 @@ const FileCredForm: FC<FileCredFormProps> = ({ onBack, onSuccess }) => {
         name="name"
         rules={[{ required: true, message: t('creds.form.nameRequired') }]}
       >
-        <Input placeholder="e.g., GCP Service Account" />
+        <Input disabled={disabled} placeholder="e.g., GCP Service Account" />
       </Form.Item>
 
       <Form.Item label={t('creds.form.description')} name="description">
-        <Input.TextArea placeholder={t('creds.form.descriptionPlaceholder')} rows={2} />
+        <Input.TextArea
+          disabled={disabled}
+          placeholder={t('creds.form.descriptionPlaceholder')}
+          rows={2}
+        />
       </Form.Item>
 
       <div className={styles.footer}>
         <Button onClick={onBack}>{t('creds.form.back')}</Button>
         <Button
-          disabled={!fileHashId}
+          disabled={!fileHashId || disabled}
           htmlType="submit"
           loading={createMutation.isPending}
           type="primary"

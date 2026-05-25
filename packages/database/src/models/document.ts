@@ -3,6 +3,7 @@ import { and, count, desc, eq, inArray, isNull, notInArray } from 'drizzle-orm';
 import type { DocumentItem, NewDocument } from '../schemas';
 import { DOCUMENT_FOLDER_TYPE, documents } from '../schemas';
 import type { LobeChatDatabase } from '../type';
+import { buildWorkspacePayload, buildWorkspaceWhere } from '../utils/workspace';
 
 export interface QueryDocumentParams {
   current?: number;
@@ -14,16 +15,21 @@ export interface QueryDocumentParams {
 export class DocumentModel {
   private userId: string;
   private db: LobeChatDatabase;
+  private workspaceId?: string;
 
-  constructor(db: LobeChatDatabase, userId: string) {
+  constructor(db: LobeChatDatabase, userId: string, workspaceId?: string) {
     this.userId = userId;
     this.db = db;
+    this.workspaceId = workspaceId;
   }
+
+  private ownership = () =>
+    buildWorkspaceWhere({ userId: this.userId, workspaceId: this.workspaceId }, documents);
 
   findOrCreateFolder = async (name: string, parentId?: string): Promise<DocumentItem> => {
     const existing = await this.db.query.documents.findFirst({
       where: and(
-        eq(documents.userId, this.userId),
+        this.ownership(),
         eq(documents.fileType, DOCUMENT_FOLDER_TYPE),
         eq(documents.filename, name),
         parentId ? eq(documents.parentId, parentId) : isNull(documents.parentId),
@@ -48,20 +54,23 @@ export class DocumentModel {
   create = async (params: Omit<NewDocument, 'userId'>): Promise<DocumentItem> => {
     const result = (await this.db
       .insert(documents)
-      .values({ ...params, userId: this.userId })
+      .values(
+        buildWorkspacePayload(
+          { userId: this.userId, workspaceId: this.workspaceId },
+          { ...params },
+        ),
+      )
       .returning()) as DocumentItem[];
 
     return result[0]!;
   };
 
   delete = async (id: string) => {
-    return this.db
-      .delete(documents)
-      .where(and(eq(documents.id, id), eq(documents.userId, this.userId)));
+    return this.db.delete(documents).where(and(eq(documents.id, id), this.ownership()));
   };
 
   deleteAll = async () => {
-    return this.db.delete(documents).where(eq(documents.userId, this.userId));
+    return this.db.delete(documents).where(this.ownership());
   };
 
   query = async ({
@@ -74,7 +83,7 @@ export class DocumentModel {
     total: number;
   }> => {
     const offset = current * pageSize;
-    const conditions = [eq(documents.userId, this.userId)];
+    const conditions = [this.ownership()];
 
     if (fileTypes?.length) {
       conditions.push(inArray(documents.fileType, fileTypes));
@@ -141,39 +150,19 @@ export class DocumentModel {
 
   findById = async (id: string): Promise<DocumentItem | undefined> => {
     return this.db.query.documents.findFirst({
-      where: and(eq(documents.userId, this.userId), eq(documents.id, id)),
+      where: and(this.ownership(), eq(documents.id, id)),
     });
   };
 
   findByFileId = async (fileId: string) => {
     return this.db.query.documents.findFirst({
-      where: and(eq(documents.userId, this.userId), eq(documents.fileId, fileId)),
+      where: and(this.ownership(), eq(documents.fileId, fileId)),
     });
   };
 
   findBySlug = async (slug: string): Promise<DocumentItem | undefined> => {
     return this.db.query.documents.findFirst({
-      where: and(eq(documents.userId, this.userId), eq(documents.slug, slug)),
-    });
-  };
-
-  /**
-   * Look up the user's existing document for a given `(source, sourceType)` pair.
-   *
-   * Crawl-style ingestion flows (`sourceType: 'web'`) use this to dedupe by URL
-   * so repeated crawls of the same page update the existing row instead of
-   * appending a fresh one — see .
-   */
-  findBySource = async (
-    source: string,
-    sourceType: NonNullable<NewDocument['sourceType']>,
-  ): Promise<DocumentItem | undefined> => {
-    return this.db.query.documents.findFirst({
-      where: and(
-        eq(documents.userId, this.userId),
-        eq(documents.source, source),
-        eq(documents.sourceType, sourceType),
-      ),
+      where: and(this.ownership(), eq(documents.slug, slug)),
     });
   };
 
@@ -181,6 +170,6 @@ export class DocumentModel {
     return this.db
       .update(documents)
       .set({ ...value, updatedAt: new Date() })
-      .where(and(eq(documents.userId, this.userId), eq(documents.id, id)));
+      .where(and(this.ownership(), eq(documents.id, id)));
   };
 }

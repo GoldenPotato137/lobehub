@@ -16,7 +16,6 @@ import { LucideArrowRight, LucideBolt } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 import urlJoin from 'url-join';
 
 import { ProviderItemRender } from '@/components/ModelSelect';
@@ -25,6 +24,7 @@ import ModelDetailPanel from '@/features/ModelSwitchPanel/components/ModelDetail
 import { styles as modelSwitchPanelStyles } from '@/features/ModelSwitchPanel/styles';
 import type { ListItem } from '@/features/ModelSwitchPanel/types';
 import { menuKey } from '@/features/ModelSwitchPanel/utils';
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
 import type { EnabledProviderWithModels } from '@/types/index';
 
 import GenerationMultipleProvidersItem from './GenerationMultipleProvidersItem';
@@ -42,7 +42,7 @@ export interface GenerationListItemRendererProps {
 const GenerationListItemRenderer = memo<GenerationListItemRendererProps>(
   ({ item, activeKey, onClose, onModelChange, enabledList, ModelItemComponent, pricingMode }) => {
     const { t } = useTranslation('components');
-    const navigate = useNavigate();
+    const navigate = useWorkspaceAwareNavigate();
     const [detailOpen, setDetailOpen] = useState(false);
 
     switch (item.type) {

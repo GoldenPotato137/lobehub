@@ -23,7 +23,7 @@
   "brief.agentSignal.selfReview.proposal.heading": "Suggerimento",
   "brief.agentSignal.selfReview.proposal.summary": "{{count}} suggerimento del sogno necessita della tua revisione.",
   "brief.agentSignal.selfReview.proposal.summary_plural": "{{count}} suggerimenti del sogno necessitano della tua revisione.",
-  "brief.agentSignal.selfReview.proposal.title": "Suggerimento del sogno da rivedere",
+  "brief.agentSignal.selfReview.proposal.title": "Suggerimento del sogno da revisionare",
   "brief.collapse": "Mostra meno",
   "brief.commentPlaceholder": "Condividi il tuo feedback...",
   "brief.commentSubmit": "Invia feedback",

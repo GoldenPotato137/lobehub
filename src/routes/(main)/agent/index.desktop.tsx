@@ -10,6 +10,7 @@ import { useChatStore } from '@/store/chat';
 
 import Conversation from './features/Conversation';
 import ChatHydration from './features/Conversation/ChatHydration';
+import PageTitle from './features/PageTitle';
 import TelemetryNotification from './features/TelemetryNotification';
 
 const ChatPage = memo(() => {
@@ -25,9 +26,13 @@ const ChatPage = memo(() => {
   // to the popup instead.
   const pageContent =
     urlTopicId && popup ? (
-      <TopicInPopupGuard popup={popup} />
+      <>
+        <PageTitle />
+        <TopicInPopupGuard popup={popup} />
+      </>
     ) : (
       <>
+        <PageTitle />
         <Flexbox
           horizontal
           height={'100%'}

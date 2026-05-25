@@ -28,8 +28,6 @@ vi.mock('@lobechat/heterogeneous-agents/client', () => ({
           icon: () => <span>Codex Icon</span>,
           title: 'Codex',
         },
-  isRemoteHeterogeneousType: (type: string) =>
-    ['openclaw', 'hermes', 'amp', 'opencode'].includes(type),
 }));
 
 vi.mock('@lobehub/ui', () => ({

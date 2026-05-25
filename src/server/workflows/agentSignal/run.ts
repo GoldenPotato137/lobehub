@@ -602,6 +602,7 @@ export const runAgentSignalWorkflow = async (
                         agentId: payload.agentId,
                         db,
                         userId: payload.userId,
+                        workspaceId: payload.workspaceId,
                       },
                       {
                         policyOptions: {

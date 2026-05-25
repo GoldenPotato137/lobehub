@@ -12,7 +12,7 @@ describe('resolveAgentOnboardingContext', () => {
         },
         context: {
           finished: false,
-          missingStructuredFields: ['agentName'],
+          missingStructuredFields: ['interests'],
           phase: 'discovery',
           topicId: 'topic-bootstrap',
           version: 1,

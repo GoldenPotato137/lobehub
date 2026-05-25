@@ -5,7 +5,8 @@ import { Avatar, Flexbox } from '@lobehub/ui';
 import { createStaticStyles } from 'antd-style';
 import { ArrowRight } from 'lucide-react';
 import { memo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
 
 import { type MarkdownElementProps } from '../../type';
 
@@ -17,9 +18,9 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   card: css`
     cursor: pointer;
 
-    padding-block: 14px;
-    padding-inline: 14px;
-    border-radius: 10px;
+    padding-block: 10px;
+    padding-inline: 12px;
+    border-radius: 8px;
 
     background: ${cssVar.colorFillQuaternary};
 
@@ -37,18 +38,9 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     text-overflow: ellipsis;
     white-space: nowrap;
   `,
-  content: css`
-    /* Allow the text column to shrink below its content width so the
-       nowrap title/description ellipsize instead of overflowing the card. */
-    min-width: 0;
-  `,
   title: css`
-    overflow: hidden;
-
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   `,
 }));
 
@@ -62,7 +54,7 @@ interface LobeAgentsProps extends MarkdownElementProps {
 
 const Render = memo<LobeAgentsProps>(
   ({ identifier, title, description, avatar, backgroundColor }) => {
-    const navigate = useNavigate();
+    const navigate = useWorkspaceAwareNavigate();
 
     const handleClick = useCallback(() => {
       if (!identifier) return;
@@ -77,10 +69,10 @@ const Render = memo<LobeAgentsProps>(
           avatar={avatar || '🤖'}
           background={backgroundColor}
           shape={'square'}
-          size={40}
+          size={36}
           title={title || undefined}
         />
-        <Flexbox className={styles.content} flex={1} gap={4}>
+        <Flexbox flex={1} gap={2}>
           <span className={styles.title}>{title || identifier}</span>
           {description && <span className={styles.description}>{description}</span>}
         </Flexbox>

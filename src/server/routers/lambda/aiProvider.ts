@@ -1,10 +1,12 @@
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
+import { withScopedPermission } from '@/business/server/trpc-middlewares/rbacPermission';
+import { wsCompatProcedure } from '@/business/server/trpc-middlewares/workspaceAuth';
 import { AiProviderModel } from '@/database/models/aiProvider';
 import { UserModel } from '@/database/models/user';
 import { AiInfraRepos } from '@/database/repositories/aiInfra';
-import { authedProcedure, router } from '@/libs/trpc/lambda';
+import { router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { getServerGlobalConfig } from '@/server/globalConfig';
 import { KeyVaultsGateKeeper } from '@/server/modules/KeyVaultsEncrypt';
@@ -17,8 +19,9 @@ import {
 } from '@/types/aiProvider';
 import { type ProviderConfig } from '@/types/user/settings';
 
-const aiProviderProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
+const aiProviderProcedure = wsCompatProcedure.use(serverDatabase).use(async (opts) => {
   const { ctx } = opts;
+  const wsId = ctx.workspaceId ?? undefined;
 
   const { aiProvider } = await getServerGlobalConfig();
 
@@ -30,7 +33,7 @@ const aiProviderProcedure = authedProcedure.use(serverDatabase).use(async (opts)
         ctx.userId,
         aiProvider as Record<string, ProviderConfig>,
       ),
-      aiProviderModel: new AiProviderModel(ctx.serverDB, ctx.userId),
+      aiProviderModel: new AiProviderModel(ctx.serverDB, ctx.userId, wsId),
       gateKeeper,
       userModel: new UserModel(ctx.serverDB, ctx.userId),
     },
@@ -39,6 +42,7 @@ const aiProviderProcedure = authedProcedure.use(serverDatabase).use(async (opts)
 
 export const aiProviderRouter = router({
   checkProviderConnectivity: aiProviderProcedure
+    .use(withScopedPermission('ai_provider:update'))
     .input(
       z.object({
         id: z.string(),
@@ -86,6 +90,7 @@ export const aiProviderRouter = router({
     }),
 
   createAiProvider: aiProviderProcedure
+    .use(withScopedPermission('ai_provider:create'))
     .input(CreateAiProviderSchema)
     .mutation(async ({ input, ctx }) => {
       try {
@@ -121,12 +126,14 @@ export const aiProviderRouter = router({
     }),
 
   removeAiProvider: aiProviderProcedure
+    .use(withScopedPermission('ai_provider:delete'))
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
       return ctx.aiProviderModel.delete(input.id);
     }),
 
   toggleProviderEnabled: aiProviderProcedure
+    .use(withScopedPermission('ai_provider:update'))
     .input(
       z.object({
         enabled: z.boolean(),
@@ -138,6 +145,7 @@ export const aiProviderRouter = router({
     }),
 
   updateAiProvider: aiProviderProcedure
+    .use(withScopedPermission('ai_provider:update'))
     .input(
       z.object({
         id: z.string(),
@@ -149,6 +157,7 @@ export const aiProviderRouter = router({
     }),
 
   updateAiProviderConfig: aiProviderProcedure
+    .use(withScopedPermission('ai_provider:update'))
     .input(
       z.object({
         id: z.string(),
@@ -165,6 +174,7 @@ export const aiProviderRouter = router({
     }),
 
   updateAiProviderOrder: aiProviderProcedure
+    .use(withScopedPermission('ai_provider:update'))
     .input(
       z.object({
         sortMap: z.array(

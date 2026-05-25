@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react';
 
 import LineCredentialExtras from './line/CredentialExtras';
-import type { PlatformCredentialBodyProps } from './types';
+import type { PlatformCredentialBodyProps, PlatformCredentialExtrasProps } from './types';
 import WechatCredentialBody from './wechat/CredentialBody';
 
 export const platformCredentialBodyMap: Record<
@@ -18,6 +18,9 @@ export const platformCredentialBodyMap: Record<
  * /v2/bot/info" button — anything that augments the auto-generated form
  * without replacing it wholesale.
  */
-export const platformCredentialExtrasMap: Record<string, ComponentType> = {
+export const platformCredentialExtrasMap: Record<
+  string,
+  ComponentType<PlatformCredentialExtrasProps>
+> = {
   line: LineCredentialExtras,
 };

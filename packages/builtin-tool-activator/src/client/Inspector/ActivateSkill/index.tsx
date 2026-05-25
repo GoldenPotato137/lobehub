@@ -3,31 +3,12 @@
 import { type BuiltinInspectorProps } from '@lobechat/types';
 import { SkillsIcon } from '@lobehub/ui/icons';
 import { createStaticStyles, cx } from 'antd-style';
-import { type TFunction } from 'i18next';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { inspectorTextStyles, shinyTextStyles } from '@/styles';
 
-import type { ActivateSkillParams, ActivateSkillSource, ActivateSkillState } from '../../../types';
-
-/**
- * `t` is invoked with literal keys per branch so i18next's typed-key map can
- * still validate the call site.
- */
-const resolveLabel = (t: TFunction<'plugin'>, source: ActivateSkillSource | undefined): string => {
-  switch (source) {
-    case 'agent': {
-      return t('builtins.lobe-skills.apiName.activateAgentSkill');
-    }
-    case 'project': {
-      return t('builtins.lobe-skills.apiName.activateProjectSkill');
-    }
-    default: {
-      return t('builtins.lobe-skills.apiName.activateSkill');
-    }
-  }
-};
+import type { ActivateSkillParams, ActivateSkillState } from '../../../types';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
   chip: css`
@@ -69,20 +50,19 @@ export const ActivateSkillInspector = memo<
   const { t } = useTranslation('plugin');
 
   const name = args?.name || partialArgs?.name;
-  const displayName = pluginState?.title || pluginState?.name || name;
-  const label = resolveLabel(t, pluginState?.source);
+  const displayName = pluginState?.name || name;
 
   if (isArgumentsStreaming) {
     if (!displayName)
       return (
         <div className={cx(inspectorTextStyles.root, shinyTextStyles.shinyText)}>
-          <span>{label}</span>
+          <span>{t('builtins.lobe-skills.apiName.activateSkill')}</span>
         </div>
       );
 
     return (
       <div className={cx(inspectorTextStyles.root, shinyTextStyles.shinyText)}>
-        <span>{label}:</span>
+        <span>{t('builtins.lobe-skills.apiName.activateSkill')}:</span>
         <span className={styles.chip}>
           <SkillsIcon className={styles.skillIcon} size={12} />
           <span className={styles.skillName}>{displayName}</span>
@@ -93,7 +73,7 @@ export const ActivateSkillInspector = memo<
 
   return (
     <div className={cx(inspectorTextStyles.root, isLoading && shinyTextStyles.shinyText)}>
-      <span>{label}:</span>
+      <span>{t('builtins.lobe-skills.apiName.activateSkill')}:</span>
       {displayName && (
         <span className={styles.chip}>
           <SkillsIcon className={styles.skillIcon} size={12} />

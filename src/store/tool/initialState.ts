@@ -1,7 +1,3 @@
-import {
-  type AgentDocumentSkillsState,
-  initialAgentDocumentSkillsState,
-} from './slices/agentDocumentSkills/initialState';
 import { type AgentSkillsState, initialAgentSkillsState } from './slices/agentSkills/initialState';
 import { type BuiltinToolState, initialBuiltinToolState } from './slices/builtin/initialState';
 import {
@@ -22,8 +18,7 @@ export type ToolStoreState = PluginState &
   MCPStoreState &
   KlavisStoreState &
   LobehubSkillStoreState &
-  AgentSkillsState &
-  AgentDocumentSkillsState;
+  AgentSkillsState;
 
 export const initialState: ToolStoreState = {
   ...initialPluginState,
@@ -33,5 +28,4 @@ export const initialState: ToolStoreState = {
   ...initialKlavisStoreState,
   ...initialLobehubSkillStoreState,
   ...initialAgentSkillsState,
-  ...initialAgentDocumentSkillsState,
 };

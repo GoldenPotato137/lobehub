@@ -46,7 +46,6 @@ describe('systemStatusSelectors', () => {
         showSystemRole: true,
         mobileShowTopic: true,
         mobileShowPortal: true,
-        showAgentBuilderPanel: true,
         showRightPanel: true,
         showLeftPanel: true,
         showFilePanel: true,
@@ -65,7 +64,6 @@ describe('systemStatusSelectors', () => {
       expect(systemStatusSelectors.showSystemRole(s)).toBe(true);
       expect(systemStatusSelectors.mobileShowTopic(s)).toBe(true);
       expect(systemStatusSelectors.mobileShowPortal(s)).toBe(true);
-      expect(systemStatusSelectors.showAgentBuilderPanel(s)).toBe(true);
       expect(systemStatusSelectors.showRightPanel(s)).toBe(true);
       expect(systemStatusSelectors.showLeftPanel(s)).toBe(true);
       expect(systemStatusSelectors.showFilePanel(s)).toBe(true);
@@ -83,7 +81,6 @@ describe('systemStatusSelectors', () => {
       const zenState = merge(s, {
         status: { zenMode: true },
       });
-      expect(systemStatusSelectors.showAgentBuilderPanel(zenState)).toBe(false);
       expect(systemStatusSelectors.showRightPanel(zenState)).toBe(false);
       expect(systemStatusSelectors.showLeftPanel(zenState)).toBe(false);
       expect(systemStatusSelectors.showChatHeader(zenState)).toBe(false);

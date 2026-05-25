@@ -3,26 +3,39 @@ import type { TaskListItem, TaskParticipant } from '@lobechat/types';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
+import { withScopedPermission } from '@/business/server/trpc-middlewares/rbacPermission';
+import { wsCompatProcedure } from '@/business/server/trpc-middlewares/workspaceAuth';
 import { AgentModel } from '@/database/models/agent';
 import { BriefModel } from '@/database/models/brief';
 import { TaskModel } from '@/database/models/task';
 import { TaskTopicModel } from '@/database/models/taskTopic';
-import { authedProcedure, router } from '@/libs/trpc/lambda';
+import { TopicModel } from '@/database/models/topic';
+import { router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { TaskService } from '@/server/services/task';
+import { TaskLifecycleService } from '@/server/services/taskLifecycle';
 import { TaskRunnerService } from '@/server/services/taskRunner';
 
-const taskProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
+const taskProcedure = wsCompatProcedure.use(serverDatabase).use(async (opts) => {
   const { ctx } = opts;
+  const wsId = ctx.workspaceId ?? undefined;
   return opts.next({
     ctx: {
-      agentModel: new AgentModel(ctx.serverDB, ctx.userId),
-      taskModel: new TaskModel(ctx.serverDB, ctx.userId),
-      taskService: new TaskService(ctx.serverDB, ctx.userId),
-      taskTopicModel: new TaskTopicModel(ctx.serverDB, ctx.userId),
+      agentModel: new AgentModel(ctx.serverDB, ctx.userId, wsId),
+      briefModel: new BriefModel(ctx.serverDB, ctx.userId, wsId),
+      taskLifecycle: new TaskLifecycleService(ctx.serverDB, ctx.userId, wsId),
+      taskModel: new TaskModel(ctx.serverDB, ctx.userId, wsId),
+      taskService: new TaskService(ctx.serverDB, ctx.userId, wsId),
+      taskTopicModel: new TaskTopicModel(ctx.serverDB, ctx.userId, wsId),
+      topicModel: new TopicModel(ctx.serverDB, ctx.userId, wsId),
     },
   });
 });
+
+// Write variant gates viewers out of every task mutation (create/update/delete/
+// run). Reads keep using `taskProcedure` so viewers can still inspect tasks
+// and their status.
+const taskProcedureWrite = taskProcedure.use(withScopedPermission('agent:update'));
 
 // All procedures that take an id accept either raw id (task_xxx) or identifier (TASK-1)
 // Resolution happens in the model layer via model.resolve()
@@ -148,7 +161,7 @@ async function resolveSafeParentTaskId(
 }
 
 export const taskRouter = router({
-  reorderSubtasks: taskProcedure
+  reorderSubtasks: taskProcedureWrite
     .input(
       z.object({
         id: z.string(),
@@ -201,7 +214,7 @@ export const taskRouter = router({
       }
     }),
 
-  addComment: taskProcedure
+  addComment: taskProcedureWrite
     .input(
       z.object({
         authorAgentId: z.string().optional(),
@@ -237,7 +250,7 @@ export const taskRouter = router({
       }
     }),
 
-  deleteComment: taskProcedure
+  deleteComment: taskProcedureWrite
     .input(z.object({ commentId: z.string() }))
     .mutation(async ({ input, ctx }) => {
       try {
@@ -257,7 +270,7 @@ export const taskRouter = router({
       }
     }),
 
-  updateComment: taskProcedure
+  updateComment: taskProcedureWrite
     .input(z.object({ commentId: z.string(), content: z.string().min(1) }))
     .mutation(async ({ input, ctx }) => {
       try {
@@ -277,7 +290,7 @@ export const taskRouter = router({
       }
     }),
 
-  addDependency: taskProcedure
+  addDependency: taskProcedureWrite
     .input(
       z.object({
         dependsOnId: z.string(),
@@ -303,7 +316,7 @@ export const taskRouter = router({
       }
     }),
 
-  cancelTopic: taskProcedure
+  cancelTopic: taskProcedureWrite
     .input(z.object({ topicId: z.string() }))
     .mutation(async ({ input, ctx }) => {
       try {
@@ -320,7 +333,7 @@ export const taskRouter = router({
       }
     }),
 
-  deleteTopic: taskProcedure
+  deleteTopic: taskProcedureWrite
     .input(z.object({ topicId: z.string() }))
     .mutation(async ({ input, ctx }) => {
       try {
@@ -337,7 +350,7 @@ export const taskRouter = router({
       }
     }),
 
-  create: taskProcedure.input(createSchema).mutation(async ({ input, ctx }) => {
+  create: taskProcedureWrite.input(createSchema).mutation(async ({ input, ctx }) => {
     try {
       const task = await ctx.taskService.createTask(input);
       return { data: task, message: 'Task created', success: true };
@@ -353,7 +366,7 @@ export const taskRouter = router({
     }
   }),
 
-  clearAll: taskProcedure.mutation(async ({ ctx }) => {
+  clearAll: taskProcedureWrite.mutation(async ({ ctx }) => {
     try {
       const model = ctx.taskModel;
       const count = await model.deleteAll();
@@ -368,7 +381,7 @@ export const taskRouter = router({
     }
   }),
 
-  delete: taskProcedure.input(idInput).mutation(async ({ input, ctx }) => {
+  delete: taskProcedureWrite.input(idInput).mutation(async ({ input, ctx }) => {
     try {
       const model = ctx.taskModel;
       const task = await resolveOrThrow(model, input.id);
@@ -505,7 +518,7 @@ export const taskRouter = router({
     }
   }),
 
-  heartbeat: taskProcedure.input(idInput).mutation(async ({ input, ctx }) => {
+  heartbeat: taskProcedureWrite.input(idInput).mutation(async ({ input, ctx }) => {
     try {
       const model = ctx.taskModel;
       const task = await resolveOrThrow(model, input.id);
@@ -522,20 +535,21 @@ export const taskRouter = router({
     }
   }),
 
-  watchdog: taskProcedure.mutation(async ({ ctx }) => {
+  watchdog: taskProcedureWrite.mutation(async ({ ctx }) => {
     try {
       const stuckTasks = await TaskModel.findStuckTasks(ctx.serverDB);
       const failed: string[] = [];
 
       for (const task of stuckTasks) {
-        const model = new TaskModel(ctx.serverDB, task.createdByUserId);
+        const wsId = task.workspaceId ?? undefined;
+        const model = new TaskModel(ctx.serverDB, task.createdByUserId, wsId);
         await model.updateStatus(task.id, 'failed', {
           completedAt: new Date(),
           error: 'Heartbeat timeout',
         });
 
         // Create error brief
-        const briefModel = new BriefModel(ctx.serverDB, task.createdByUserId);
+        const briefModel = new BriefModel(ctx.serverDB, task.createdByUserId, wsId);
         await briefModel.create({
           agentId: task.assigneeAgentId || undefined,
           priority: 'urgent',
@@ -642,7 +656,7 @@ export const taskRouter = router({
     }
   }),
 
-  run: taskProcedure
+  run: taskProcedureWrite
     .input(
       idInput.merge(
         z.object({
@@ -653,7 +667,11 @@ export const taskRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       try {
-        const runner = new TaskRunnerService(ctx.serverDB, ctx.userId);
+        const runner = new TaskRunnerService(
+          ctx.serverDB,
+          ctx.userId,
+          ctx.workspaceId ?? undefined,
+        );
         return await runner.runTask({
           continueTopicId: input.continueTopicId,
           extraPrompt: input.prompt,
@@ -670,7 +688,7 @@ export const taskRouter = router({
       }
     }),
 
-  pinDocument: taskProcedure
+  pinDocument: taskProcedureWrite
     .input(
       z.object({
         documentId: z.string(),
@@ -695,7 +713,7 @@ export const taskRouter = router({
       }
     }),
 
-  removeDependency: taskProcedure
+  removeDependency: taskProcedureWrite
     .input(z.object({ dependsOnId: z.string(), taskId: z.string() }))
     .mutation(async ({ input, ctx }) => {
       try {
@@ -715,7 +733,7 @@ export const taskRouter = router({
       }
     }),
 
-  unpinDocument: taskProcedure
+  unpinDocument: taskProcedureWrite
     .input(z.object({ documentId: z.string(), taskId: z.string() }))
     .mutation(async ({ input, ctx }) => {
       try {
@@ -751,7 +769,7 @@ export const taskRouter = router({
     }
   }),
 
-  updateCheckpoint: taskProcedure
+  updateCheckpoint: taskProcedureWrite
     .input(
       idInput.merge(
         z.object({
@@ -812,7 +830,7 @@ export const taskRouter = router({
     }
   }),
 
-  updateReview: taskProcedure
+  updateReview: taskProcedureWrite
     .input(
       idInput.merge(
         z.object({
@@ -864,7 +882,7 @@ export const taskRouter = router({
       }
     }),
 
-  runReview: taskProcedure
+  runReview: taskProcedureWrite
     .input(
       idInput.merge(
         z.object({
@@ -888,7 +906,7 @@ export const taskRouter = router({
       }
     }),
 
-  update: taskProcedure.input(idInput.merge(updateSchema)).mutation(async ({ input, ctx }) => {
+  update: taskProcedureWrite.input(idInput.merge(updateSchema)).mutation(async ({ input, ctx }) => {
     const { id, parentTaskId, ...data } = input;
     try {
       const model = ctx.taskModel;
@@ -914,7 +932,7 @@ export const taskRouter = router({
     }
   }),
 
-  updateConfig: taskProcedure
+  updateConfig: taskProcedureWrite
     .input(idInput.merge(z.object({ config: z.record(z.unknown()) })))
     .mutation(async ({ input, ctx }) => {
       const { id, config } = input;
@@ -950,7 +968,7 @@ export const taskRouter = router({
     }
   }),
 
-  runReadySubtasks: taskProcedure.input(idInput).mutation(async ({ input, ctx }) => {
+  runReadySubtasks: taskProcedureWrite.input(idInput).mutation(async ({ input, ctx }) => {
     try {
       const result = await ctx.taskService.runReadySubtasks(input.id);
       return { data: result, success: result.failed.length === 0 };
@@ -965,7 +983,7 @@ export const taskRouter = router({
     }
   }),
 
-  updateStatus: taskProcedure
+  updateStatus: taskProcedureWrite
     .input(
       z.object({
         error: z.string().optional(),

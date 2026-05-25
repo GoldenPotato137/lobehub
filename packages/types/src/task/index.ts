@@ -147,6 +147,7 @@ export interface TaskItem {
   status: string;
   totalTopics: number | null;
   updatedAt: Date;
+  workspaceId: string | null;
 }
 
 export type TaskListItem = TaskItem & {
@@ -185,6 +186,7 @@ export interface NewTask {
   status?: string;
   totalTopics?: number | null;
   updatedAt?: Date;
+  workspaceId?: string | null;
 }
 
 // ── Task Detail (shared across CLI, viewTask tool, task.detail router) ──
@@ -306,7 +308,7 @@ export interface TaskDetailData {
   identifier: string;
   instruction: string;
   name?: string | null;
-  parent?: { agentId?: string | null; identifier: string; name: string | null } | null;
+  parent?: { identifier: string; name: string | null } | null;
   priority?: number | null;
   review?: Record<string, any> | null;
   schedule?: {

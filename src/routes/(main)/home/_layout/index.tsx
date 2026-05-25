@@ -4,6 +4,7 @@ import { Activity, type FC, type ReactNode, useEffect, useMemo, useState } from 
 import { Outlet, useLocation } from 'react-router-dom';
 
 import { useIsDark } from '@/hooks/useIsDark';
+import { useWorkspaceStore, workspaceSelectors } from '@/store/workspace';
 
 import HomeAgentIdSync from './HomeAgentIdSync';
 import RecentHydration from './RecentHydration';
@@ -18,7 +19,10 @@ const Layout: FC<LayoutProps> = ({ children }) => {
   const isDarkMode = useIsDark();
   const theme = useTheme(); // Keep for colorBgContainerSecondary (not in cssVar)
   const { pathname } = useLocation();
-  const isHomeRoute = pathname === '/';
+  const activeSlug = useWorkspaceStore((s) => workspaceSelectors.activeWorkspace(s)?.slug ?? null);
+  const isHomeRoute =
+    pathname === '/' ||
+    (!!activeSlug && (pathname === `/${activeSlug}` || pathname === `/${activeSlug}/`));
   const [hasActivated, setHasActivated] = useState(isHomeRoute);
   const content = children ?? <Outlet />;
 
@@ -39,7 +43,14 @@ const Layout: FC<LayoutProps> = ({ children }) => {
   // Keep the Home layout alive and render it offscreen when inactive.
   return (
     <Activity mode={isHomeRoute ? 'visible' : 'hidden'} name="DesktopHomeLayout">
-      <Flexbox className={styles.absoluteContainer} height={'100%'} width={'100%'}>
+      {/* `position: absolute; inset: 0` keeps overlaying the outlet when Activity is hidden,
+        because Activity preserves state but doesn't visually hide the DOM. Force-hide here. */}
+      <Flexbox
+        className={styles.absoluteContainer}
+        height={'100%'}
+        style={isHomeRoute ? undefined : { display: 'none' }}
+        width={'100%'}
+      >
         <Sidebar />
         <Flexbox
           className={isDarkMode ? styles.contentDark : styles.contentLight}

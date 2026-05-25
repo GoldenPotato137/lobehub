@@ -1,4 +1,3 @@
-import { isRecord } from '@lobechat/utils';
 import { ModelProvider } from 'model-bank';
 
 import { createOpenAICompatibleRuntime } from '../../core/openaiCompatibleFactory';
@@ -39,6 +38,9 @@ const pruneUnsupportedChatCompletionParameters = (payload: ChatStreamPayload) =>
 
   return stripUnsupportedPenaltyParameters(payload);
 };
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const hasSlashDelimitedEnumValue = (value: unknown) =>
   Array.isArray(value) && value.some((item) => typeof item === 'string' && item.includes('/'));

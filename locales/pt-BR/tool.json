@@ -47,7 +47,7 @@
   "claudeCode.askUserQuestion.skip": "Pular",
   "claudeCode.askUserQuestion.submit": "Enviar",
   "claudeCode.askUserQuestion.timeExpired": "Tempo esgotado — usando a opção 1 de cada pergunta.",
-  "claudeCode.askUserQuestion.timeRemaining": "Tempo restante: {{time}} · perguntas não respondidas serão definidas como a opção 1 ao expirar o tempo.",
+  "claudeCode.askUserQuestion.timeRemaining": "Tempo restante: {{time}} · perguntas não respondidas serão definidas como opção 1 ao expirar o tempo.",
   "codeInterpreter-legacy.error": "Erro de Execução",
   "codeInterpreter-legacy.executing": "Executando...",
   "codeInterpreter-legacy.files": "Arquivos:",

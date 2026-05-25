@@ -176,20 +176,18 @@ export const TaskInspector = memo<BuiltinInspectorProps<TaskInspectorArgs, TaskP
     // pluginState snapshot; the trailing `completed/total` chip makes the
     // accumulation visible across rows (the ring alone stays empty while
     // every new task is still `todo`, so total wouldn't otherwise show).
-    // Verb flips to past tense once the call finishes — the chip persists
-    // in chat history and "Creating task" frozen on a settled row reads as
-    // if it's still running (see ui.md principle 4).
     if (apiName === ClaudeCodeApiName.TaskCreate) {
       const subject = ((args || partialArgs) as TaskCreateArgs | undefined)?.subject;
-      const inFlight = isArgumentsStreaming || isLoading;
-      const label = t(
-        inFlight
-          ? 'builtins.lobe-claude-code.task.create.loading'
-          : 'builtins.lobe-claude-code.task.create.completed',
-      );
-      const text = subject ? `${label}${subject}` : label;
+      const text = subject
+        ? `${t('builtins.lobe-claude-code.task.createLabel')}${subject}`
+        : t('builtins.lobe-claude-code.task.createLabel');
       return (
-        <div className={cx(inspectorTextStyles.root, inFlight && shinyTextStyles.shinyText)}>
+        <div
+          className={cx(
+            inspectorTextStyles.root,
+            (isArgumentsStreaming || isLoading) && shinyTextStyles.shinyText,
+          )}
+        >
           <ProgressRing stats={stats} />
           {stats.total > 0 && (
             <span className={styles.countChip}>
@@ -248,37 +246,6 @@ export const TaskInspector = memo<BuiltinInspectorProps<TaskInspectorArgs, TaskP
           </div>
         );
       }
-
-      // Subject-only edit (rename / initial subject set, no status flip): the
-      // per-call signal IS the new subject — surface it like the status branch
-      // does, otherwise we fall through to the aggregate "Todos: x/y" chip
-      // which buries the per-row signal. Args wins over the pluginState
-      // snapshot since this call IS the new value being set.
-      const taskId = updateArgs?.taskId;
-      const subject =
-        updateArgs?.subject ??
-        (taskId ? items.find((item) => item.id === taskId)?.text : undefined);
-      if (subject) {
-        const inFlight = isArgumentsStreaming || isLoading;
-        const verb = t(
-          inFlight
-            ? 'builtins.lobe-claude-code.task.updateSubject.loading'
-            : 'builtins.lobe-claude-code.task.updateSubject.completed',
-        );
-        return (
-          <div className={cx(inspectorTextStyles.root, inFlight && shinyTextStyles.shinyText)}>
-            <ProgressRing stats={stats} />
-            {stats.total > 0 && (
-              <span className={styles.countChip}>
-                {stats.completed}/{stats.total}
-              </span>
-            )}
-            <span style={{ marginInlineStart: stats.total > 0 ? 6 : 0 }}>
-              {`${verb}: ${subject}`}
-            </span>
-          </div>
-        );
-      }
     }
 
     // No pluginState yet (args streaming or tool_use → tool_result gap):
@@ -286,26 +253,22 @@ export const TaskInspector = memo<BuiltinInspectorProps<TaskInspectorArgs, TaskP
     // TodoWriteInspector's `isArgumentsStreaming && stats.total === 0` branch.
     if (stats.total === 0) {
       const resolvedArgs = (args || partialArgs) as TaskInspectorArgs | undefined;
-      const inFlight = isArgumentsStreaming || isLoading;
       const fallback = (() => {
         if (apiName === ClaudeCodeApiName.TaskUpdate) {
           const taskId = (resolvedArgs as TaskUpdateArgs | undefined)?.taskId;
-          if (!taskId) return t('builtins.lobe-claude-code.todoWrite.todos');
-          return t(
-            inFlight
-              ? 'builtins.lobe-claude-code.task.update.loading'
-              : 'builtins.lobe-claude-code.task.update.completed',
-            { taskId },
-          );
+          return taskId
+            ? t('builtins.lobe-claude-code.task.updateLabel', { taskId })
+            : t('builtins.lobe-claude-code.todoWrite.todos');
         }
-        return t(
-          inFlight
-            ? 'builtins.lobe-claude-code.task.list.loading'
-            : 'builtins.lobe-claude-code.task.list.completed',
-        );
+        return t('builtins.lobe-claude-code.task.listLabel');
       })();
       return (
-        <div className={cx(inspectorTextStyles.root, inFlight && shinyTextStyles.shinyText)}>
+        <div
+          className={cx(
+            inspectorTextStyles.root,
+            (isArgumentsStreaming || isLoading) && shinyTextStyles.shinyText,
+          )}
+        >
           {fallback}
         </div>
       );

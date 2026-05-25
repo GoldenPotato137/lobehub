@@ -9,6 +9,7 @@ import { memo } from 'react';
 import DiffAllToolbar from '@/features/EditorCanvas/DiffAllToolbar';
 import WideScreenContainer from '@/features/WideScreenContainer';
 import { useRegisterFilesHotkeys } from '@/hooks/useHotkeys';
+import { usePermission } from '@/hooks/usePermission';
 import { usePageStore } from '@/store/page';
 import { StyleSheet } from '@/utils/styles';
 
@@ -16,6 +17,7 @@ import EditorCanvas from './EditorCanvas';
 import Header from './Header';
 import { PageAgentProvider } from './PageAgentProvider';
 import { PageEditorProvider } from './PageEditorProvider';
+import PageTitle from './PageTitle';
 import RightPanel from './RightPanel';
 import { usePageEditorStore } from './store';
 import TitleSection from './TitleSection';
@@ -73,6 +75,7 @@ interface PageEditorCanvasProps {
 }
 
 const PageEditorCanvas = memo<PageEditorCanvasProps>(({ header, fullWidthHeader }) => {
+  const { allowed: canEdit } = usePermission('edit_own_content');
   const editor = usePageEditorStore((s) => s.editor);
   const documentId = usePageEditorStore((s) => s.documentId);
 
@@ -85,7 +88,14 @@ const PageEditorCanvas = memo<PageEditorCanvasProps>(({ header, fullWidthHeader 
     <Flexbox flex={1} height={'100%'} style={styles.editorContainer}>
       {!fullWidthHeader && headerSlot}
       <Flexbox horizontal height={'100%'} style={styles.contentWrapper} width={'100%'}>
-        <WideScreenContainer wrapperStyle={{ cursor: 'text' }} onClick={() => editor?.focus()}>
+        <WideScreenContainer
+          wrapperStyle={{ cursor: canEdit ? 'text' : 'not-allowed' }}
+          onClick={() => {
+            if (!canEdit) return;
+
+            editor?.focus();
+          }}
+        >
           <Flexbox flex={1} style={styles.editorContent}>
             <TitleSection />
             <EditorCanvas />
@@ -98,26 +108,36 @@ const PageEditorCanvas = memo<PageEditorCanvasProps>(({ header, fullWidthHeader 
 
   if (fullWidthHeader) {
     return (
-      <Flexbox height={'100%'} style={{ backgroundColor: cssVar.colorBgContainer }} width={'100%'}>
-        {headerSlot}
-        <Flexbox horizontal flex={1} style={{ minHeight: 0 }} width={'100%'}>
-          {editorPane}
-          <RightPanel />
+      <>
+        <PageTitle />
+        <Flexbox
+          height={'100%'}
+          style={{ backgroundColor: cssVar.colorBgContainer }}
+          width={'100%'}
+        >
+          {headerSlot}
+          <Flexbox horizontal flex={1} style={{ minHeight: 0 }} width={'100%'}>
+            {editorPane}
+            <RightPanel />
+          </Flexbox>
         </Flexbox>
-      </Flexbox>
+      </>
     );
   }
 
   return (
-    <Flexbox
-      horizontal
-      height={'100%'}
-      style={{ backgroundColor: cssVar.colorBgContainer }}
-      width={'100%'}
-    >
-      {editorPane}
-      <RightPanel />
-    </Flexbox>
+    <>
+      <PageTitle />
+      <Flexbox
+        horizontal
+        height={'100%'}
+        style={{ backgroundColor: cssVar.colorBgContainer }}
+        width={'100%'}
+      >
+        {editorPane}
+        <RightPanel />
+      </Flexbox>
+    </>
   );
 });
 
@@ -139,6 +159,7 @@ export const PageEditor: FC<PageEditorProps> = ({
   title,
   emoji,
 }) => {
+  const { allowed: canEdit } = usePermission('edit_own_content');
   const deletePage = usePageStore((s) => s.deletePage);
 
   return (
@@ -150,11 +171,27 @@ export const PageEditor: FC<PageEditorProps> = ({
           pageId={pageId}
           title={title}
           onBack={onBack}
-          onDelete={() => deletePage(pageId || '')}
           onDocumentIdChange={onDocumentIdChange}
-          onEmojiChange={onEmojiChange}
-          onSave={onSave}
-          onTitleChange={onTitleChange}
+          onDelete={() => {
+            if (!canEdit) return;
+
+            deletePage(pageId || '');
+          }}
+          onEmojiChange={(emoji) => {
+            if (!canEdit) return;
+
+            onEmojiChange?.(emoji);
+          }}
+          onSave={() => {
+            if (!canEdit) return;
+
+            onSave?.();
+          }}
+          onTitleChange={(nextTitle) => {
+            if (!canEdit) return;
+
+            onTitleChange?.(nextTitle);
+          }}
         >
           <PageEditorCanvas fullWidthHeader={fullWidthHeader} header={header} />
         </PageEditorProvider>

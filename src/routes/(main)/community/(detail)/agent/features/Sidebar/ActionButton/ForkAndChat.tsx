@@ -6,9 +6,10 @@ import { createStaticStyles } from 'antd-style';
 import { customAlphabet } from 'nanoid/non-secure';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 
 import { SESSION_CHAT_URL } from '@/const/url';
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
+import { usePermission } from '@/hooks/usePermission';
 import { useMarketAuth } from '@/layout/AuthProvider/MarketAuth';
 import { agentService } from '@/services/agent';
 import { discoverService } from '@/services/discover';
@@ -40,9 +41,10 @@ const ForkAndChat = memo<{ mobile?: boolean }>(({ mobile }) => {
   const createAgent = useAgentStore((s) => s.createAgent);
   const refreshAgentList = useHomeStore((s) => s.refreshAgentList);
   const { message } = App.useApp();
-  const navigate = useNavigate();
+  const navigate = useWorkspaceAwareNavigate();
   const { t } = useTranslation('discover');
   const { isAuthenticated, signIn } = useMarketAuth();
+  const { allowed: canCreate } = usePermission('create_content');
 
   const meta = {
     avatar,
@@ -54,6 +56,7 @@ const ForkAndChat = memo<{ mobile?: boolean }>(({ mobile }) => {
   };
 
   const handleForkAndChat = async () => {
+    if (!canCreate) return;
     // Check if user is authenticated
     if (!isAuthenticated) {
       try {
@@ -140,6 +143,7 @@ const ForkAndChat = memo<{ mobile?: boolean }>(({ mobile }) => {
     <Button
       block
       className={styles.buttonGroup}
+      disabled={!canCreate}
       loading={isLoading}
       size={'large'}
       type={'primary'}

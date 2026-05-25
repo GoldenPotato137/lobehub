@@ -545,7 +545,7 @@ describe('execAgent', () => {
       const [agentWithTools] = await serverDB
         .insert(agents)
         .values({
-          chatConfig: { searchMode: 'auto' },
+          chatConfig: { autoCreateTopicThreshold: 2, searchMode: 'auto' },
           model: 'gpt-5-pro',
           plugins: [],
           provider: 'openai',

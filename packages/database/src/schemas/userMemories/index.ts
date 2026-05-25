@@ -3,6 +3,7 @@ import { bigint, index, jsonb, numeric, pgTable, real, text, vector } from 'driz
 import { idGenerator } from '../../utils/idGenerator';
 import { timestamps, timestamptz, varchar255 } from '../_helpers';
 import { users } from '../user';
+import { workspaces } from '../workspace';
 
 export const userMemories = pgTable(
   'user_memories',
@@ -12,6 +13,7 @@ export const userMemories = pgTable(
       .primaryKey(),
 
     userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    workspaceId: text('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }),
 
     memoryCategory: varchar255('memory_category'),
     memoryLayer: varchar255('memory_layer'),
@@ -43,6 +45,7 @@ export const userMemories = pgTable(
       table.detailsVector1024.op('vector_cosine_ops'),
     ),
     index('user_memories_user_id_index').on(table.userId),
+    index('user_memories_workspace_id_index').on(table.workspaceId),
   ],
 );
 
@@ -54,6 +57,7 @@ export const userMemoriesContexts = pgTable(
       .primaryKey(),
 
     userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    workspaceId: text('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }),
     userMemoryIds: jsonb('user_memory_ids').$type<string[]>(),
 
     metadata: jsonb('metadata').$type<Record<string, unknown>>(),
@@ -89,6 +93,7 @@ export const userMemoriesContexts = pgTable(
     ),
     index('user_memories_contexts_type_index').on(table.type),
     index('user_memories_contexts_user_id_index').on(table.userId),
+    index('user_memories_contexts_workspace_id_index').on(table.workspaceId),
   ],
 );
 
@@ -100,6 +105,7 @@ export const userMemoriesPreferences = pgTable(
       .primaryKey(),
 
     userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    workspaceId: text('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }),
     userMemoryId: varchar255('user_memory_id').references(() => userMemories.id, {
       onDelete: 'cascade',
     }),
@@ -126,6 +132,7 @@ export const userMemoriesPreferences = pgTable(
     ),
     index('user_memories_preferences_user_id_index').on(table.userId),
     index('user_memories_preferences_user_memory_id_index').on(table.userMemoryId),
+    index('user_memories_preferences_workspace_id_index').on(table.workspaceId),
   ],
 );
 
@@ -137,6 +144,7 @@ export const userMemoriesActivities = pgTable(
       .primaryKey(),
 
     userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    workspaceId: text('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }),
     userMemoryId: varchar255('user_memory_id').references(() => userMemories.id, {
       onDelete: 'cascade',
     }),
@@ -196,6 +204,7 @@ export const userMemoriesActivities = pgTable(
     index('user_memories_activities_user_id_index').on(table.userId),
     index('user_memories_activities_user_memory_id_index').on(table.userMemoryId),
     index('user_memories_activities_status_index').on(table.status),
+    index('user_memories_activities_workspace_id_index').on(table.workspaceId),
   ],
 );
 
@@ -207,6 +216,7 @@ export const userMemoriesIdentities = pgTable(
       .primaryKey(),
 
     userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    workspaceId: text('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }),
     userMemoryId: varchar255('user_memory_id').references(() => userMemories.id, {
       onDelete: 'cascade',
     }),
@@ -233,6 +243,7 @@ export const userMemoriesIdentities = pgTable(
     index('user_memories_identities_type_index').on(table.type),
     index('user_memories_identities_user_id_index').on(table.userId),
     index('user_memories_identities_user_memory_id_index').on(table.userMemoryId),
+    index('user_memories_identities_workspace_id_index').on(table.workspaceId),
   ],
 );
 
@@ -244,6 +255,7 @@ export const userMemoriesExperiences = pgTable(
       .primaryKey(),
 
     userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    workspaceId: text('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }),
     userMemoryId: varchar255('user_memory_id').references(() => userMemories.id, {
       onDelete: 'cascade',
     }),
@@ -283,6 +295,7 @@ export const userMemoriesExperiences = pgTable(
     index('user_memories_experiences_type_index').on(table.type),
     index('user_memories_experiences_user_id_index').on(table.userId),
     index('user_memories_experiences_user_memory_id_index').on(table.userMemoryId),
+    index('user_memories_experiences_workspace_id_index').on(table.workspaceId),
   ],
 );
 

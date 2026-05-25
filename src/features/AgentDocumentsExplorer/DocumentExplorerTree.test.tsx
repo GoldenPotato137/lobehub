@@ -6,6 +6,12 @@ import type { ExplorerTreeNode } from '@/features/ExplorerTree';
 
 import DocumentExplorerTree from './DocumentExplorerTree';
 import type { AgentDocumentItem } from './types';
+import {
+  AGENT_SKILL_TEMPLATE_ID,
+  FOLDER_FILE_TYPE,
+  SKILL_BUNDLE_FILE_TYPE,
+  SKILL_INDEX_FILE_TYPE,
+} from './types';
 
 const { navigate, openDocument, useMatchMock } = vi.hoisted(() => ({
   navigate: vi.fn(),
@@ -26,10 +32,6 @@ vi.mock('@lobehub/ui', () => ({
   ),
   Flexbox: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   Text: ({ children }: { children?: ReactNode }) => <span>{children}</span>,
-}));
-
-vi.mock('@lobehub/ui/base-ui', () => ({
-  confirmModal: modalConfirm,
 }));
 
 vi.mock('antd', () => ({
@@ -139,7 +141,6 @@ const createDocument = (overrides: Partial<AgentDocumentItem>): AgentDocumentIte
     accessSelf: 0,
     accessShared: 0,
     agentId: 'agent-1',
-    category: 'document',
     content: '',
     createdAt: new Date('2026-05-09T00:00:00Z'),
     deletedAt: null,
@@ -152,9 +153,6 @@ const createDocument = (overrides: Partial<AgentDocumentItem>): AgentDocumentIte
     filename: 'document.md',
     fileType: 'custom/document',
     id: 'agent-doc-1',
-    isFolder: false,
-    isSkillBundle: false,
-    isSkillIndex: false,
     loadRules: {},
     metadata: null,
     parentId: null,
@@ -189,33 +187,27 @@ describe('DocumentExplorerTree', () => {
   it('renders managed skill bundle as a folder with SKILL.md underneath', () => {
     const data = [
       createDocument({
-        category: 'skill',
         documentId: 'skill-bundle-doc',
-        fileType: 'skills/bundle',
+        fileType: SKILL_BUNDLE_FILE_TYPE,
         filename: 'youtube-comment-retrieval-workflow',
         id: 'skill-bundle-row',
-        isFolder: true,
-        isSkillBundle: true,
-        templateId: 'agent-skill',
+        templateId: AGENT_SKILL_TEMPLATE_ID,
         title: 'YouTube Comment Retrieval Workflow',
       }),
       createDocument({
-        category: 'skill',
         documentId: 'skill-index-doc',
-        fileType: 'skills/index',
+        fileType: SKILL_INDEX_FILE_TYPE,
         filename: 'SKILL.md',
         id: 'skill-index-row',
-        isSkillIndex: true,
         parentId: 'skill-bundle-doc',
-        templateId: 'agent-skill',
+        templateId: AGENT_SKILL_TEMPLATE_ID,
         title: 'Generated workflow title',
       }),
       createDocument({
         documentId: 'folder-doc',
-        fileType: 'custom/folder',
+        fileType: FOLDER_FILE_TYPE,
         filename: 'Notes',
         id: 'folder-row',
-        isFolder: true,
         title: 'Notes',
       }),
     ];
@@ -237,25 +229,20 @@ describe('DocumentExplorerTree', () => {
   it('opens SKILL.md but does not open the empty skill bundle', () => {
     const data = [
       createDocument({
-        category: 'skill',
         documentId: 'skill-bundle-doc',
-        fileType: 'skills/bundle',
+        fileType: SKILL_BUNDLE_FILE_TYPE,
         filename: 'youtube-comment-retrieval-workflow',
         id: 'skill-bundle-row',
-        isFolder: true,
-        isSkillBundle: true,
-        templateId: 'agent-skill',
+        templateId: AGENT_SKILL_TEMPLATE_ID,
         title: 'YouTube Comment Retrieval Workflow',
       }),
       createDocument({
-        category: 'skill',
         documentId: 'skill-index-doc',
-        fileType: 'skills/index',
+        fileType: SKILL_INDEX_FILE_TYPE,
         filename: 'SKILL.md',
         id: 'skill-index-row',
-        isSkillIndex: true,
         parentId: 'skill-bundle-doc',
-        templateId: 'agent-skill',
+        templateId: AGENT_SKILL_TEMPLATE_ID,
         title: 'SKILL.md',
       }),
     ];
@@ -273,14 +260,11 @@ describe('DocumentExplorerTree', () => {
     const mutate = vi.fn().mockResolvedValue(undefined);
     const data = [
       createDocument({
-        category: 'skill',
         documentId: 'skill-bundle-doc',
-        fileType: 'skills/bundle',
+        fileType: SKILL_BUNDLE_FILE_TYPE,
         filename: 'youtube-comment-retrieval-workflow',
         id: 'skill-bundle-row',
-        isFolder: true,
-        isSkillBundle: true,
-        templateId: 'agent-skill',
+        templateId: AGENT_SKILL_TEMPLATE_ID,
         title: 'YouTube Comment Retrieval Workflow',
       }),
     ];

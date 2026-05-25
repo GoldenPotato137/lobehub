@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -17,6 +17,7 @@ const { chatInputSpy, messageItemSpy, mockState } = vi.hoisted(() => ({
   messageItemSpy: vi.fn(),
   mockState: {
     displayMessages: [] as Array<{ content?: string; id: string; role: string }>,
+    generatingIds: new Set<string>(),
     pendingInterventions: [] as Array<{ id: string }>,
   },
 }));
@@ -37,18 +38,15 @@ vi.mock('@/features/Conversation', () => ({
     return <div data-testid="chat-input" />;
   },
   ChatList: ({
-    headerSlot,
     itemContent,
     showWelcome,
     welcome,
   }: {
-    headerSlot?: ReactNode;
     itemContent?: (index: number, id: string) => ReactNode;
     showWelcome?: boolean;
     welcome?: ReactNode;
   }) => (
     <div data-testid="chat-list">
-      {headerSlot ? <div data-testid="chat-header">{headerSlot}</div> : null}
       {showWelcome ? <div data-testid="chat-welcome">{welcome}</div> : null}
       {mockState.displayMessages.map((message, index) => (
         <div key={message.id}>{itemContent?.(index, message.id)}</div>
@@ -78,11 +76,7 @@ vi.mock('@/features/Conversation/hooks/useAgentMeta', () => ({
 }));
 
 vi.mock('./Welcome', () => ({
-  default: () => <div data-testid="welcome-screen">Welcome screen</div>,
-}));
-
-vi.mock('./WelcomeMessage', () => ({
-  default: () => <div data-testid="welcome-message">Welcome message</div>,
+  default: () => <div data-testid="welcome-content">Welcome</div>,
 }));
 
 describe('AgentOnboardingConversation', () => {
@@ -90,6 +84,7 @@ describe('AgentOnboardingConversation', () => {
     chatInputSpy.mockClear();
     messageItemSpy.mockClear();
     mockState.displayMessages = [];
+    mockState.generatingIds = new Set();
     mockState.pendingInterventions = [];
   });
 
@@ -108,56 +103,8 @@ describe('AgentOnboardingConversation', () => {
     render(<AgentOnboardingConversation />);
 
     expect(screen.getByTestId('chat-welcome')).toBeInTheDocument();
-    expect(screen.getByText('Welcome screen')).toBeInTheDocument();
-    expect(screen.queryByTestId('chat-header')).not.toBeInTheDocument();
+    expect(screen.getByText('Welcome')).toBeInTheDocument();
     expect(screen.queryByText('finish')).not.toBeInTheDocument();
-  });
-
-  it('suppresses the welcome flash while a returning user’s messages are still fetching', () => {
-    // Returning user: bootstrap says hasMessages=true but ChatList has not yet
-    // hydrated displayMessages — the welcome MUST stay hidden so we do not show
-    // a misleading "fresh" greeting before the transcript loads.
-    mockState.displayMessages = [];
-
-    render(<AgentOnboardingConversation hasMessages />);
-
-    expect(screen.queryByTestId('chat-welcome')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('chat-header')).not.toBeInTheDocument();
-    expect(screen.queryByText('Welcome screen')).not.toBeInTheDocument();
-    expect(screen.queryByText('Welcome message')).not.toBeInTheDocument();
-  });
-
-  it('keeps the synthetic welcome as the first list item after real messages exist', () => {
-    mockState.displayMessages = [
-      { id: 'user-1', role: 'user' },
-      { id: 'assistant-1', role: 'assistant' },
-    ];
-
-    render(<AgentOnboardingConversation hasMessages />);
-
-    const listItems = screen.getByTestId('chat-list').children;
-    expect(listItems[0]).toHaveAttribute('data-testid', 'chat-header');
-    expect(screen.getByTestId('message-item-user-1')).toBeInTheDocument();
-    expect(screen.getByTestId('message-item-assistant-1')).toBeInTheDocument();
-  });
-
-  it('does not duplicate welcome when a legacy persisted assistant opener exists', () => {
-    mockState.displayMessages = [
-      { id: 'assistant-welcome', role: 'assistant' },
-      { id: 'user-1', role: 'user' },
-    ];
-
-    render(<AgentOnboardingConversation hasMessages />);
-
-    expect(screen.queryByTestId('chat-header')).not.toBeInTheDocument();
-  });
-
-  it('forwards isInputReady=false to ChatInput as isConfigLoading', () => {
-    mockState.displayMessages = [];
-
-    render(<AgentOnboardingConversation isInputReady={false} />);
-
-    expect(chatInputSpy).toHaveBeenCalledWith(expect.objectContaining({ isConfigLoading: true }));
   });
 
   it('disables expand and runtime config in chat input', () => {
@@ -175,7 +122,7 @@ describe('AgentOnboardingConversation', () => {
     );
   });
 
-  it('disables input completion, / @ triggers, follow-up placeholder, and message queueing', () => {
+  it('disables / @ triggers, follow-up placeholder, and message queueing', () => {
     mockState.displayMessages = [{ id: 'assistant-1', role: 'assistant' }];
 
     render(<AgentOnboardingConversation />);
@@ -183,14 +130,106 @@ describe('AgentOnboardingConversation', () => {
     expect(chatInputSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         disableFollowUpVariant: true,
+        disableMention: true,
         disableQueue: true,
-        feature: expect.objectContaining({
-          inputCompletion: false,
-          mention: false,
-          slash: false,
-        }),
+        disableSlash: true,
       }),
     );
+  });
+
+  it('fires the assistant-settled callback after the latest assistant stops generating', async () => {
+    const onAssistantTurnSettled = vi.fn();
+    mockState.displayMessages = [
+      { id: 'user-1', role: 'user' },
+      { id: 'assistant-1', role: 'assistant' },
+    ];
+    mockState.generatingIds = new Set(['assistant-1']);
+
+    const { rerender } = render(
+      <AgentOnboardingConversation
+        discoveryUserMessageCount={0}
+        topicId="topic-1"
+        onAssistantTurnSettled={onAssistantTurnSettled}
+      />,
+    );
+
+    expect(onAssistantTurnSettled).not.toHaveBeenCalled();
+
+    mockState.generatingIds = new Set();
+    rerender(
+      <AgentOnboardingConversation
+        discoveryUserMessageCount={1}
+        topicId="topic-1"
+        onAssistantTurnSettled={onAssistantTurnSettled}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onAssistantTurnSettled).toHaveBeenCalledWith('assistant-1');
+    });
+    expect(onAssistantTurnSettled).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits for resumed generation after a pending intervention clears', async () => {
+    const onAssistantTurnSettled = vi.fn();
+    mockState.displayMessages = [
+      { id: 'user-1', role: 'user' },
+      { id: 'assistant-1', role: 'assistant' },
+    ];
+    mockState.generatingIds = new Set(['assistant-1']);
+
+    const { rerender } = render(
+      <AgentOnboardingConversation
+        discoveryUserMessageCount={0}
+        topicId="topic-1"
+        onAssistantTurnSettled={onAssistantTurnSettled}
+      />,
+    );
+
+    mockState.generatingIds = new Set();
+    mockState.pendingInterventions = [{ id: 'tool-1' }];
+    rerender(
+      <AgentOnboardingConversation
+        discoveryUserMessageCount={1}
+        topicId="topic-1"
+        onAssistantTurnSettled={onAssistantTurnSettled}
+      />,
+    );
+    expect(onAssistantTurnSettled).not.toHaveBeenCalled();
+
+    mockState.pendingInterventions = [];
+    rerender(
+      <AgentOnboardingConversation
+        discoveryUserMessageCount={2}
+        topicId="topic-1"
+        onAssistantTurnSettled={onAssistantTurnSettled}
+      />,
+    );
+    expect(onAssistantTurnSettled).not.toHaveBeenCalled();
+
+    mockState.generatingIds = new Set(['assistant-1']);
+    rerender(
+      <AgentOnboardingConversation
+        discoveryUserMessageCount={3}
+        topicId="topic-1"
+        onAssistantTurnSettled={onAssistantTurnSettled}
+      />,
+    );
+    expect(onAssistantTurnSettled).not.toHaveBeenCalled();
+
+    mockState.generatingIds = new Set();
+    rerender(
+      <AgentOnboardingConversation
+        discoveryUserMessageCount={4}
+        topicId="topic-1"
+        onAssistantTurnSettled={onAssistantTurnSettled}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onAssistantTurnSettled).toHaveBeenCalledWith('assistant-1');
+    });
+    expect(onAssistantTurnSettled).toHaveBeenCalledTimes(1);
   });
 
   it('renders normal message items outside the greeting state', () => {
@@ -225,5 +264,9 @@ describe('AgentOnboardingConversation', () => {
 vi.mock('@/features/Conversation/store', () => ({
   dataSelectors: {
     pendingInterventions: (state: typeof mockState) => state.pendingInterventions,
+  },
+  messageStateSelectors: {
+    isAssistantGroupItemGenerating: (id: string) => (state: typeof mockState) =>
+      state.generatingIds.has(id),
   },
 }));

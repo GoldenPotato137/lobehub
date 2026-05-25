@@ -1,8 +1,8 @@
 import { type ProviderConfig } from '@lobechat/types';
-import { type AiFullModelCard, type LobeDefaultAiModelListItem, ModelProvider } from 'model-bank';
+import { type AiFullModelCard } from 'model-bank';
+import { ModelProvider } from 'model-bank';
 import * as AiModels from 'model-bank';
 
-import { loadModels } from '@/business/client/model-bank/loadModels';
 import { getLLMConfig } from '@/envs/llm';
 import { extractEnabledModels, transformToAiModelList } from '@/utils/server/parseModels';
 
@@ -14,30 +14,18 @@ interface ProviderSpecificConfig {
   withDeploymentName?: boolean;
 }
 
-const groupModelsByProvider = (models: LobeDefaultAiModelListItem[]) =>
-  models.reduce<Record<string, AiFullModelCard[]>>((map, model) => {
-    const providerModels = map[model.providerId] ?? [];
-    providerModels.push(model);
-    map[model.providerId] = providerModels;
-    return map;
-  }, {});
-
 export const genServerAiProvidersConfig = async (
   specificConfig: Record<any, ProviderSpecificConfig>,
 ) => {
   const llmConfig = getLLMConfig() as Record<string, any>;
-  const builtinModels = groupModelsByProvider(await loadModels());
-  const staticModels = AiModels as unknown as Record<string, AiFullModelCard[] | undefined>;
 
   // Process all providers concurrently
   const providerConfigs = await Promise.all(
     Object.values(ModelProvider).map(async (provider) => {
       const providerUpperCase = provider.toUpperCase();
-      const hasStaticModels = Object.hasOwn(staticModels, provider);
-      const staticProviderModels = hasStaticModels ? staticModels[provider] : undefined;
-      const aiModels = builtinModels[provider] ?? staticProviderModels ?? [];
+      const aiModels = AiModels[provider] as AiFullModelCard[];
 
-      if (provider !== ModelProvider.LobeHub && !hasStaticModels)
+      if (!aiModels)
         throw new Error(
           `Provider [${provider}] not found in aiModels, please make sure you have exported the provider in the \`aiModels/index.ts\``,
         );

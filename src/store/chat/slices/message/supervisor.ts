@@ -102,10 +102,7 @@ export class GroupChatSupervisor {
     });
 
     try {
-      // `aiChatService.generateJSON` returns `{ data, tracingId }` — supervisor
-      // only consumes the generated payload, so unwrap eagerly. The tracingId
-      // is intentionally discarded (no feedback path here yet).
-      const envelope = await aiChatService.generateJSON(
+      const response = await aiChatService.generateJSON(
         {
           ...(contexts as any),
           model: context.model,
@@ -113,7 +110,6 @@ export class GroupChatSupervisor {
         },
         context.abortController || new AbortController(),
       );
-      const response = envelope?.data;
 
       console.info('SUPERVISOR RESPONSE', JSON.stringify(response, null, 2));
 
@@ -345,7 +341,7 @@ export class GroupChatSupervisor {
   private extractTodoData(parameter: unknown): { assignee?: string; content: string | null } {
     if (typeof parameter === 'string') {
       const trimmed = parameter.trim();
-      return { content: trimmed || null };
+      return { content: trimmed ? trimmed : null };
     }
 
     if (!parameter || typeof parameter !== 'object') return { content: null };

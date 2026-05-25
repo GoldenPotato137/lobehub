@@ -1,7 +1,5 @@
 import { Buffer } from 'buffer.js';
 
-import { resolveMimeTypeFromBytes } from './imageMimeType';
-
 export const imageToBase64 = ({
   size,
   img,
@@ -57,7 +55,6 @@ export const imageUrlToBase64 = async (
 
     const blob = await res.blob();
     const arrayBuffer = await blob.arrayBuffer();
-    const mimeType = await resolveMimeTypeFromBytes(blob.type, arrayBuffer);
 
     // Client-side uses btoa, server-side uses Buffer
     const base64 = isServer
@@ -66,7 +63,7 @@ export const imageUrlToBase64 = async (
           new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), ''),
         );
 
-    return { base64, mimeType };
+    return { base64, mimeType: blob.type };
   } catch (error) {
     console.error('Error converting image to base64:', error);
     throw error;

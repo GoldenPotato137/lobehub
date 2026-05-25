@@ -3,10 +3,6 @@ import { dirname, join, resolve } from 'node:path';
 import tsconfigPaths from 'vite-tsconfig-paths';
 import { coverageConfigDefaults, defineConfig } from 'vitest/config';
 
-if (process.env.NODE_ENV === 'production') {
-  Reflect.set(process.env, 'NODE_ENV', 'test');
-}
-
 const alias = {
   // Downstream workspaces sometimes pnpm-override @lobechat/business-* packages to
   // internal implementations whose source files import alias paths that only exist
@@ -15,14 +11,6 @@ const alias = {
   '@lobechat/business-model-runtime': resolve(
     __dirname,
     './packages/business/model-runtime/src/index.ts',
-  ),
-  '@lobechat/business-model-bank/model-config': resolve(
-    __dirname,
-    './packages/business/model-bank/src/model-config.ts',
-  ),
-  '@lobechat/business-model-bank': resolve(
-    __dirname,
-    './packages/business/model-bank/src/index.ts',
   ),
   '@emoji-mart/data': resolve(__dirname, './tests/mocks/emojiMartData.ts'),
   '@emoji-mart/react': resolve(__dirname, './tests/mocks/emojiMartReact.tsx'),
@@ -37,6 +25,10 @@ const alias = {
   '@/utils/electron': resolve(__dirname, './src/utils/electron'),
   '@/utils/markdownToTxt': resolve(__dirname, './src/utils/markdownToTxt'),
   '@/utils/sanitizeFileName': resolve(__dirname, './src/utils/sanitizeFileName'),
+  // Workspace store lives in the cloud repo; submodule-only tests get a stub
+  // that reports no active workspace so workspace-aware nav helpers behave
+  // like plain react-router.
+  '@/store/workspace': resolve(__dirname, './tests/mocks/storeWorkspace.ts'),
   '~test-utils': resolve(__dirname, './tests/utils.tsx'),
   'lru_map': resolve(__dirname, './tests/mocks/lru_map'),
 };

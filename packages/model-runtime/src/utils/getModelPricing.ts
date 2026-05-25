@@ -1,8 +1,4 @@
-import type { LobeDefaultAiModelListItem, Pricing } from 'model-bank';
-
-interface BusinessModelConfigModule {
-  loadModels: () => Promise<LobeDefaultAiModelListItem[]>;
-}
+import type { Pricing } from 'model-bank';
 
 /**
  * 1. First try to get pricing from the specified provider
@@ -15,13 +11,13 @@ export async function getModelPricing(
   model: string,
   provider?: string,
 ): Promise<Pricing | undefined> {
-  const { loadModels } =
-    (await import('@lobechat/business-model-bank/model-config')) as BusinessModelConfigModule;
-  const models = await loadModels();
+  const { LOBE_DEFAULT_MODEL_LIST } = await import('model-bank');
 
   // 1. First try to get pricing from the specified provider
   if (provider) {
-    const exactMatch = models.find((m) => m.id === model && m.providerId === provider);
+    const exactMatch = LOBE_DEFAULT_MODEL_LIST.find(
+      (m) => m.id === model && m.providerId === provider,
+    );
 
     if (exactMatch?.pricing) {
       return exactMatch.pricing;
@@ -29,7 +25,7 @@ export async function getModelPricing(
   }
 
   // 2. If not found, try to get pricing from other providers with the same model name
-  const fallbackMatch = models.find((m) => m.id === model);
+  const fallbackMatch = LOBE_DEFAULT_MODEL_LIST.find((m) => m.id === model);
 
   if (fallbackMatch?.pricing) {
     return fallbackMatch.pricing;

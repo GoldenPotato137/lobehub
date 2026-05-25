@@ -97,7 +97,7 @@
   "builtins.lobe-claude-code.task.updateDeleted": "Excluído",
   "builtins.lobe-claude-code.task.updateInProgress": "Iniciado",
   "builtins.lobe-claude-code.task.updateLabel": "Atualizando tarefa #{{taskId}}",
-  "builtins.lobe-claude-code.task.updatePending": "Redefinir",
+  "builtins.lobe-claude-code.task.updatePending": "Reiniciar",
   "builtins.lobe-claude-code.todoWrite.allDone": "Todas as tarefas concluídas",
   "builtins.lobe-claude-code.todoWrite.currentStep": "Etapa atual",
   "builtins.lobe-claude-code.todoWrite.todos": "Tarefas",

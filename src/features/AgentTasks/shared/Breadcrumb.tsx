@@ -3,13 +3,12 @@ import { Breadcrumb as AntBreadcrumb } from 'antd';
 import { ChevronRight } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
 import { useShallow } from 'zustand/react/shallow';
 
+import WorkspaceLink from '@/features/Workspace/WorkspaceLink';
 import { useTaskStore } from '@/store/task';
 
 import { styles } from './style';
-import { taskDetailPath } from './taskDetailPath';
 
 interface BreadcrumbProps {
   taskId?: string;
@@ -24,17 +23,13 @@ const Breadcrumb = memo<BreadcrumbProps>(({ taskId }) => {
   const ancestors = useTaskStore(
     useShallow((s) => {
       if (!taskId) return [];
-      const chain: Array<{ agentId?: string | null; identifier: string }> = [];
+      const chain: string[] = [];
       const visited = new Set<string>([taskId]);
-      let cursor = s.taskDetailMap[taskId]?.parent;
-      while (cursor?.identifier && !visited.has(cursor.identifier)) {
-        const detail = s.taskDetailMap[cursor.identifier];
-        visited.add(cursor.identifier);
-        chain.push({
-          agentId: cursor.agentId === undefined ? detail?.agentId : cursor.agentId,
-          identifier: cursor.identifier,
-        });
-        cursor = detail?.parent;
+      let cursor = s.taskDetailMap[taskId]?.parent?.identifier;
+      while (cursor && !visited.has(cursor)) {
+        visited.add(cursor);
+        chain.push(cursor);
+        cursor = s.taskDetailMap[cursor]?.parent?.identifier;
       }
       return chain.reverse();
     }),
@@ -46,14 +41,14 @@ const Breadcrumb = memo<BreadcrumbProps>(({ taskId }) => {
     </Text>
   );
 
-  const ancestorCrumbs = ancestors.map(({ identifier, agentId }) => ({
+  const ancestorCrumbs = ancestors.map((identifier) => ({
     key: identifier,
     title: (
-      <Link to={taskDetailPath(identifier, agentId ?? undefined)}>
+      <WorkspaceLink to={`/task/${identifier}`}>
         <Text color={'inherit'} weight={500}>
           {identifier}
         </Text>
-      </Link>
+      </WorkspaceLink>
     ),
   }));
 
@@ -100,7 +95,11 @@ const Breadcrumb = memo<BreadcrumbProps>(({ taskId }) => {
       separator={<Icon icon={ChevronRight} />}
       items={[
         {
-          title: taskId ? <Link to={'/tasks'}>{allTasksLabel}</Link> : allTasksLabel,
+          title: taskId ? (
+            <WorkspaceLink to={'/tasks'}>{allTasksLabel}</WorkspaceLink>
+          ) : (
+            allTasksLabel
+          ),
         },
         ...ancestorCrumbs,
         ...(currentTaskCrumb ? [currentTaskCrumb] : []),

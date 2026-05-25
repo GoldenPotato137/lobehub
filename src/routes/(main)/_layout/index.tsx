@@ -9,6 +9,7 @@ import { lazy, Suspense } from 'react';
 import { HotkeysProvider } from 'react-hotkeys-hook';
 import { Outlet } from 'react-router-dom';
 
+import WorkspaceContextSlot from '@/business/client/WorkspaceContextSlot';
 import Loading from '@/components/Loading/BrandTextLoading';
 import { isDesktop } from '@/const/version';
 import { BANNER_HEIGHT } from '@/features/AlertBanner/CloudBanner';
@@ -21,7 +22,6 @@ import OverlaySnapshotPublisher from '@/features/Electron/ScreenCapture/OverlayS
 import TitleBar from '@/features/Electron/titlebar/TitleBar';
 import HotkeyHelperPanel from '@/features/HotkeyHelperPanel';
 import NavPanel from '@/features/NavPanel';
-import { RouteMetaBridge } from '@/features/RouteMeta';
 import { useFeedbackModal } from '@/hooks/useFeedbackModal';
 import { usePlatform } from '@/hooks/usePlatform';
 import { MarketAuthProvider } from '@/layout/AuthProvider/MarketAuth';
@@ -52,59 +52,60 @@ const Layout: FC = () => {
 
   return (
     <HotkeysProvider initiallyActiveScopes={[HotkeyScopeEnum.Global]}>
-      <RouteMetaBridge />
-      <Suspense fallback={null}>
-        {isDesktop && <DesktopAutoOidcOnFirstOpen />}
-        {isDesktop && <DesktopNavigationBridge />}
-        {isDesktop && <DesktopFileMenuBridge />}
-        {isDesktop && <OverlaySnapshotPublisher />}
-        {isDesktop && <OverlayCaptureUploader />}
-        {isDesktop && <OverlayMessageDispatcher />}
-        {showCloudPromotion && <CloudBanner />}
-      </Suspense>
-      {isDesktop && <AuthRequiredModal />}
+      <WorkspaceContextSlot>
+        <Suspense fallback={null}>
+          {isDesktop && <DesktopAutoOidcOnFirstOpen />}
+          {isDesktop && <DesktopNavigationBridge />}
+          {isDesktop && <DesktopFileMenuBridge />}
+          {isDesktop && <OverlaySnapshotPublisher />}
+          {isDesktop && <OverlayCaptureUploader />}
+          {isDesktop && <OverlayMessageDispatcher />}
+          {showCloudPromotion && <CloudBanner />}
+        </Suspense>
+        {isDesktop && <AuthRequiredModal />}
 
-      <Suspense fallback={null}>{isDesktop && <TitleBar />}</Suspense>
-      <DndContextWrapper>
-        <Flexbox
-          horizontal
-          className={cx(isPWA ? styles.mainContainerPWA : styles.mainContainer)}
-          width={'100%'}
-          height={
-            isDesktop
-              ? `calc(100% - ${TITLE_BAR_HEIGHT}px)`
-              : showCloudPromotion
-                ? `calc(100% - ${BANNER_HEIGHT}px)`
-                : '100%'
-          }
-        >
-          <NavPanel />
-          <DesktopLayoutContainer>
-            <MarketAuthProvider isDesktop={isDesktop}>
-              <DesktopHomeLayout>
-                <DesktopHome />
-              </DesktopHomeLayout>
-              <Suspense fallback={<Loading debugId="DesktopMainLayout > Outlet" />}>
-                <Outlet />
-              </Suspense>
-            </MarketAuthProvider>
-          </DesktopLayoutContainer>
-        </Flexbox>
-      </DndContextWrapper>
-      <Suspense fallback={null}>
-        <HotkeyHelperPanel />
-        <RegisterHotkeys />
-        <CmdkLazy />
-        {isFeedbackModalOpen && (
-          <Suspense fallback={null}>
-            <FeedbackModal
-              initialValues={feedbackInitialValues}
-              open={isFeedbackModalOpen}
-              onClose={closeFeedbackModal}
-            />
-          </Suspense>
-        )}
-      </Suspense>
+        <Suspense fallback={null}>{isDesktop && <TitleBar />}</Suspense>
+        <DndContextWrapper>
+          <Flexbox
+            horizontal
+            className={cx(isPWA ? styles.mainContainerPWA : styles.mainContainer)}
+            width={'100%'}
+            height={
+              isDesktop
+                ? `calc(100% - ${TITLE_BAR_HEIGHT}px)`
+                : showCloudPromotion
+                  ? `calc(100% - ${BANNER_HEIGHT}px)`
+                  : '100%'
+            }
+          >
+            <NavPanel />
+            <DesktopLayoutContainer>
+              <MarketAuthProvider isDesktop={isDesktop}>
+                <DesktopHomeLayout>
+                  <DesktopHome />
+                </DesktopHomeLayout>
+                <Suspense fallback={<Loading debugId="DesktopMainLayout > Outlet" />}>
+                  <Outlet />
+                </Suspense>
+              </MarketAuthProvider>
+            </DesktopLayoutContainer>
+          </Flexbox>
+        </DndContextWrapper>
+        <Suspense fallback={null}>
+          <HotkeyHelperPanel />
+          <RegisterHotkeys />
+          <CmdkLazy />
+          {isFeedbackModalOpen && (
+            <Suspense fallback={null}>
+              <FeedbackModal
+                initialValues={feedbackInitialValues}
+                open={isFeedbackModalOpen}
+                onClose={closeFeedbackModal}
+              />
+            </Suspense>
+          )}
+        </Suspense>
+      </WorkspaceContextSlot>
     </HotkeysProvider>
   );
 };

@@ -9,11 +9,9 @@ import {
   RetrievalUserMemoryIdentitiesProvider,
   UserPersonaExtractor,
 } from '@lobechat/memory-user-memory';
-import type { UserServiceModelConfig } from '@lobechat/types';
 import { desc, eq } from 'drizzle-orm';
 
 import { getBusinessModelRuntimeHooks } from '@/business/server/model-runtime';
-import { UserModel } from '@/database/models/user';
 import { UserMemoryModel } from '@/database/models/userMemory';
 import { UserPersonaModel } from '@/database/models/userMemory/persona';
 import { AiInfraRepos } from '@/database/repositories/aiInfra';
@@ -49,14 +47,6 @@ interface UserPersonaAgentResult {
   document: UserPersonaDocument;
 }
 
-const resolvePositiveInteger = (value?: number) => {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return undefined;
-
-  return Math.floor(value);
-};
-
-const normalizeProvider = (provider: string) => provider.toLowerCase();
-
 export class UserPersonaService {
   private readonly preferredLanguage?: string;
   private readonly db: LobeChatDatabase;
@@ -70,40 +60,15 @@ export class UserPersonaService {
     this.agentConfig = agentPersonaWriter;
   }
 
-  private async resolveAgentConfig(userId: string): Promise<MemoryAgentConfig> {
-    const userModel = new UserModel(this.db, userId);
-    const settings = await userModel.getUserSettings();
-    const userMemoryPersonaWriter = (
-      settings?.systemAgent as Partial<UserServiceModelConfig> | undefined
-    )?.userMemoryPersonaWriter;
-    const provider = userMemoryPersonaWriter?.provider || this.agentConfig.provider;
-    const shouldInheritCredentials =
-      !userMemoryPersonaWriter?.provider ||
-      normalizeProvider(userMemoryPersonaWriter.provider) ===
-        normalizeProvider(this.agentConfig.provider || 'openai');
-
-    return {
-      apiKey: shouldInheritCredentials ? this.agentConfig.apiKey : undefined,
-      baseURL: shouldInheritCredentials ? this.agentConfig.baseURL : undefined,
-      contextLimit:
-        resolvePositiveInteger(userMemoryPersonaWriter?.contextLimit) ??
-        this.agentConfig.contextLimit,
-      language: this.agentConfig.language,
-      model: userMemoryPersonaWriter?.model || this.agentConfig.model,
-      provider,
-    };
-  }
-
   async composeWriting(payload: UserPersonaAgentPayload): Promise<UserPersonaAgentResult> {
-    const agentConfig = await this.resolveAgentConfig(payload.userId);
     const aiInfraRepos = new AiInfraRepos(this.db, payload.userId, {});
     const runtimeState = await aiInfraRepos.getAiProviderRuntimeState(
       KeyVaultsGateKeeper.getUserKeyVaults,
     );
     const providerId = await AiInfraRepos.tryMatchingProviderFrom(runtimeState, {
-      fallbackProvider: agentConfig.provider,
+      fallbackProvider: this.agentConfig.provider,
       label: 'persona writer',
-      modelId: agentConfig.model,
+      modelId: this.agentConfig.model,
     });
 
     const keyVaults: ProviderKeyVaultMap = Object.entries(runtimeState.runtimeConfig || {}).reduce(
@@ -117,12 +82,12 @@ export class UserPersonaService {
     const hooks = getBusinessModelRuntimeHooks(payload.userId, 'lobehub');
 
     const runtime = await resolveRuntimeAgentConfig(
-      agentConfig,
+      { ...this.agentConfig },
       keyVaults,
       {
         fallback: {
-          apiKey: agentConfig.apiKey,
-          baseURL: agentConfig.baseURL,
+          apiKey: this.agentConfig.apiKey,
+          baseURL: this.agentConfig.baseURL,
         },
         preferred: { providerIds: [providerId] },
         userId: payload.userId,
@@ -136,7 +101,7 @@ export class UserPersonaService {
 
     const extractor = new UserPersonaExtractor({
       agent: 'user-persona',
-      model: agentConfig.model,
+      model: this.agentConfig.model,
       modelRuntime: runtime,
     });
 
@@ -171,14 +136,7 @@ export const buildUserPersonaJobInput = async (db: LobeChatDatabase, userId: str
   const personaModel = new UserPersonaModel(db, userId);
   const latestPersona = await personaModel.getLatestPersonaDocument();
   const { agentPersonaWriter } = parseMemoryExtractionConfig();
-  const userModel = new UserModel(db, userId);
-  const settings = await userModel.getUserSettings();
-  const userMemoryPersonaWriter = (
-    settings?.systemAgent as Partial<UserServiceModelConfig> | undefined
-  )?.userMemoryPersonaWriter;
-  const personaContextLimit =
-    resolvePositiveInteger(userMemoryPersonaWriter?.contextLimit) ??
-    agentPersonaWriter.contextLimit;
+  const personaContextLimit = agentPersonaWriter.contextLimit;
 
   const userMemoryModel = new UserMemoryModel(db, userId);
 

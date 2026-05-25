@@ -7,6 +7,8 @@ import { createStaticStyles } from 'antd-style';
 import { type FC, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { usePermission } from '@/hooks/usePermission';
+
 import CredTypeSelector from './CredTypeSelector';
 import FileCredForm from './FileCredForm';
 import KVCredForm from './KVCredForm';
@@ -29,10 +31,13 @@ interface CreateCredModalProps {
 
 const CreateCredModal: FC<CreateCredModalProps> = ({ open, onCancel, onSuccess }) => {
   const { t } = useTranslation('setting');
+  const { allowed: canManageCredentials } = usePermission('manage_provider_key');
   const [step, setStep] = useState(0);
   const [credType, setCredType] = useState<CredType | null>(null);
 
   const handleTypeSelect = (type: CredType) => {
+    if (!canManageCredentials) return;
+
     setCredType(type);
     setStep(1);
   };
@@ -58,13 +63,32 @@ const CreateCredModal: FC<CreateCredModalProps> = ({ open, onCancel, onSuccess }
     switch (credType) {
       case 'kv-env':
       case 'kv-header': {
-        return <KVCredForm type={credType} onBack={handleBack} onSuccess={handleSuccess} />;
+        return (
+          <KVCredForm
+            disabled={!canManageCredentials}
+            type={credType}
+            onBack={handleBack}
+            onSuccess={handleSuccess}
+          />
+        );
       }
       case 'oauth': {
-        return <OAuthCredForm onBack={handleBack} onSuccess={handleSuccess} />;
+        return (
+          <OAuthCredForm
+            disabled={!canManageCredentials}
+            onBack={handleBack}
+            onSuccess={handleSuccess}
+          />
+        );
       }
       case 'file': {
-        return <FileCredForm onBack={handleBack} onSuccess={handleSuccess} />;
+        return (
+          <FileCredForm
+            disabled={!canManageCredentials}
+            onBack={handleBack}
+            onSuccess={handleSuccess}
+          />
+        );
       }
       default: {
         return null;
@@ -91,7 +115,11 @@ const CreateCredModal: FC<CreateCredModalProps> = ({ open, onCancel, onSuccess }
           ]}
         />
 
-        {step === 0 ? <CredTypeSelector onSelect={handleTypeSelect} /> : renderForm()}
+        {step === 0 ? (
+          <CredTypeSelector disabled={!canManageCredentials} onSelect={handleTypeSelect} />
+        ) : (
+          renderForm()
+        )}
       </div>
     </Modal>
   );

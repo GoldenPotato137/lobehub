@@ -1,16 +1,17 @@
-import { isObjectLike } from '@lobechat/utils';
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
 
 export const hasMeaningfulEditorContent = (editorData: unknown): boolean => {
-  if (!isObjectLike(editorData)) return false;
+  if (!isRecord(editorData)) return false;
 
   const root = editorData.root;
 
   // Unknown shapes are treated as meaningful so callers do not drop data they
   // cannot safely classify.
-  if (!isObjectLike(root) || !Array.isArray(root.children)) return true;
+  if (!isRecord(root) || !Array.isArray(root.children)) return true;
 
   const walk = (node: unknown): boolean => {
-    if (!isObjectLike(node)) return false;
+    if (!isRecord(node)) return false;
 
     if (typeof node.text === 'string' && node.text.trim().length > 0) return true;
 

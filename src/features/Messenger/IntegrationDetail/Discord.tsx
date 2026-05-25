@@ -5,6 +5,8 @@ import { LinkIcon, ServerIcon, Trash2Icon, UserIcon } from 'lucide-react';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { usePermission } from '@/hooks/usePermission';
+
 import { buildDiscordOpenBotUrl } from '../constants';
 import LinkModal from '../LinkModal';
 import {
@@ -32,6 +34,8 @@ interface DiscordDetailProps {
 // (`messenger.discord.connections.*`) makes that distinction explicit.
 const DiscordDetail = memo<DiscordDetailProps>(({ appId, botUsername, name, onBack }) => {
   const { t } = useTranslation('messenger');
+  const { allowed: canCreate } = usePermission('create_content');
+  const { allowed: canEdit } = usePermission('edit_own_content');
   const [linkOpen, setLinkOpen] = useState(false);
 
   const data = useMessengerData('discord');
@@ -47,6 +51,7 @@ const DiscordDetail = memo<DiscordDetailProps>(({ appId, botUsername, name, onBa
   });
 
   const handleDisconnectInstallation = (id: string) =>
+    canEdit &&
     disconnectInstallation(id, {
       confirm: t('messenger.discord.connections.disconnectConfirm'),
       failedKey: 'messenger.discord.connections.disconnectFailed',
@@ -63,9 +68,13 @@ const DiscordDetail = memo<DiscordDetailProps>(({ appId, botUsername, name, onBa
 
   const headerAction = (
     <Button
+      disabled={!canCreate || !canEdit}
       icon={<Icon icon={LinkIcon} />}
       type={hasInstallations ? 'default' : 'primary'}
-      onClick={() => setLinkOpen(true)}
+      onClick={() => {
+        if (!canCreate || !canEdit) return;
+        setLinkOpen(true);
+      }}
     >
       {hasInstallations ? t('messenger.detail.addServer') : t('messenger.linkCta')}
     </Button>
@@ -90,6 +99,7 @@ const DiscordDetail = memo<DiscordDetailProps>(({ appId, botUsername, name, onBa
             action={
               <Button
                 danger
+                disabled={!canEdit}
                 icon={<Icon icon={Trash2Icon} />}
                 size="small"
                 onClick={() => handleDisconnectInstallation(install.id)}
@@ -115,6 +125,7 @@ const DiscordDetail = memo<DiscordDetailProps>(({ appId, botUsername, name, onBa
               status="pending"
               action={
                 <Button
+                  disabled={!canCreate || !canEdit}
                   href={buildDiscordOpenBotUrl(appId)}
                   icon={<Icon icon={LinkIcon} />}
                   size="small"

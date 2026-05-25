@@ -1,5 +1,3 @@
-import { getJinaReaderBaseUrl } from '@lobechat/utils';
-
 import type { CrawlImpl } from '../type';
 import { toFetchError } from '../utils/errorType';
 import { parseJSONResponse } from '../utils/response';
@@ -14,7 +12,7 @@ export const jina: CrawlImpl<{ apiKey?: string }> = async (url, params) => {
   try {
     res = await withTimeout(
       (signal) =>
-        fetch(`${getJinaReaderBaseUrl()}/${url}`, {
+        fetch(`https://r.jina.ai/${url}`, {
           headers: {
             'Accept': 'application/json',
             'Authorization': token ? `Bearer ${token}` : '',

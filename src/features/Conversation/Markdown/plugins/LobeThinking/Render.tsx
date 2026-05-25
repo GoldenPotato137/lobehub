@@ -5,17 +5,14 @@ import Thinking from '@/features/Conversation/components/Thinking';
 import { useUserStore } from '@/store/user';
 import { userGeneralSettingsSelectors } from '@/store/user/selectors';
 
-import { dataSelectors, messageStateSelectors, useConversationStore } from '../../../store';
+import { dataSelectors, useConversationStore } from '../../../store';
 import { type MarkdownElementProps } from '../type';
 import { isTagClosed } from '../utils';
 
 const Render = memo<MarkdownElementProps>(({ children, id }) => {
   const [isGenerating] = useConversationStore((s) => {
     const message = dataSelectors.getDbMessageById(id)(s);
-    return [
-      !isTagClosed(ARTIFACT_THINKING_TAG, message?.content) &&
-        messageStateSelectors.isMessageGenerating(id)(s),
-    ];
+    return [!isTagClosed(ARTIFACT_THINKING_TAG, message?.content)];
   });
   const transitionMode = useUserStore(userGeneralSettingsSelectors.transitionMode);
 

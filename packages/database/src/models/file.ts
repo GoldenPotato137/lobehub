@@ -16,15 +16,21 @@ import {
   knowledgeBaseFiles,
 } from '../schemas';
 import type { LobeChatDatabase, Transaction } from '../type';
+import { buildWorkspacePayload, buildWorkspaceWhere } from '../utils/workspace';
 
 export class FileModel {
   private readonly userId: string;
   private db: LobeChatDatabase;
+  private workspaceId?: string;
 
-  constructor(db: LobeChatDatabase, userId: string) {
+  constructor(db: LobeChatDatabase, userId: string, workspaceId?: string) {
     this.userId = userId;
     this.db = db;
+    this.workspaceId = workspaceId;
   }
+
+  private ownership = () =>
+    buildWorkspaceWhere({ userId: this.userId, workspaceId: this.workspaceId }, files);
 
   /**
    * Get file by ID without userId filter (public access)
@@ -66,7 +72,12 @@ export class FileModel {
 
       const result = (await tx
         .insert(files)
-        .values({ ...params, userId: this.userId })
+        .values(
+          buildWorkspacePayload(
+            { userId: this.userId, workspaceId: this.workspaceId },
+            { ...params },
+          ),
+        )
         .returning()) as FileItem[];
 
       const item = result[0]!;
@@ -95,9 +106,8 @@ export class FileModel {
   updateGlobalFile = async (
     hashId: string,
     data: Partial<Pick<NewGlobalFile, 'metadata' | 'url'>>,
-    trx?: Transaction,
   ) => {
-    return (trx ?? this.db).update(globalFiles).set(data).where(eq(globalFiles.hashId, hashId));
+    return this.db.update(globalFiles).set(data).where(eq(globalFiles.hashId, hashId));
   };
 
   checkHash = async (hash: string) => {
@@ -150,7 +160,7 @@ export class FileModel {
       }
 
       // 4. Delete file record
-      await tx.delete(files).where(and(eq(files.id, id), eq(files.userId, this.userId)));
+      await tx.delete(files).where(and(eq(files.id, id), this.ownership()));
 
       if (!fileHash) return;
 
@@ -184,7 +194,7 @@ export class FileModel {
         totalSize: sum(files.size),
       })
       .from(files)
-      .where(eq(files.userId, this.userId));
+      .where(this.ownership());
 
     return parseInt(result[0].totalSize!) || 0;
   };
@@ -195,7 +205,7 @@ export class FileModel {
     return await this.db.transaction(async (trx) => {
       // 1. First get the file list to return the deleted files
       const fileList = await trx.query.files.findMany({
-        where: and(inArray(files.id, ids), eq(files.userId, this.userId)),
+        where: and(inArray(files.id, ids), this.ownership()),
       });
 
       if (fileList.length === 0) return [];
@@ -227,7 +237,7 @@ export class FileModel {
       }
 
       // 5. Delete file records
-      await trx.delete(files).where(and(inArray(files.id, ids), eq(files.userId, this.userId)));
+      await trx.delete(files).where(and(inArray(files.id, ids), this.ownership()));
 
       // If global files don't need to be deleted, no storage object should be removed.
       if (!removeGlobalFile || hashList.length === 0) return [];
@@ -259,7 +269,7 @@ export class FileModel {
   };
 
   clear = async () => {
-    return this.db.delete(files).where(eq(files.userId, this.userId));
+    return this.db.delete(files).where(this.ownership());
   };
 
   query = async ({
@@ -271,10 +281,7 @@ export class FileModel {
     showFilesInKnowledgeBase,
   }: QueryFileListParams = {}) => {
     // 1. Build where clause
-    let whereClause = and(
-      q ? ilike(files.name, `%${q}%`) : undefined,
-      eq(files.userId, this.userId),
-    );
+    let whereClause = and(q ? ilike(files.name, `%${q}%`) : undefined, this.ownership());
     if (category && category !== FilesTabs.All && category !== FilesTabs.Home) {
       const fileTypePrefix = this.getFileTypePrefix(category as FilesTabs);
       if (Array.isArray(fileTypePrefix)) {
@@ -349,14 +356,14 @@ export class FileModel {
 
   findByIds = async (ids: string[]) => {
     return this.db.query.files.findMany({
-      where: and(inArray(files.id, ids), eq(files.userId, this.userId)),
+      where: and(inArray(files.id, ids), this.ownership()),
     });
   };
 
   findById = async (id: string, trx?: Transaction) => {
     const database = trx || this.db;
     return database.query.files.findFirst({
-      where: and(eq(files.id, id), eq(files.userId, this.userId)),
+      where: and(eq(files.id, id), this.ownership()),
     });
   };
 
@@ -375,7 +382,7 @@ export class FileModel {
     this.db
       .update(files)
       .set({ ...value, updatedAt: new Date() })
-      .where(and(eq(files.id, id), eq(files.userId, this.userId)));
+      .where(and(eq(files.id, id), this.ownership()));
 
   /**
    * get the corresponding file type prefix according to FilesTabs
@@ -405,10 +412,7 @@ export class FileModel {
 
   findByNames = async (fileNames: string[]) =>
     this.db.query.files.findMany({
-      where: and(
-        or(...fileNames.map((name) => like(files.name, `${name}%`))),
-        eq(files.userId, this.userId),
-      ),
+      where: and(or(...fileNames.map((name) => like(files.name, `${name}%`))), this.ownership()),
     });
 
   // Abstract common method for deleting chunks

@@ -150,6 +150,7 @@ const createPolicyOptions = (
       db: context.db,
       ...policyOptions?.userMemory,
       userId: context.userId,
+      workspaceId: context.workspaceId,
     },
     skillManagement: {
       db: context.db,

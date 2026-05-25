@@ -1,5 +1,5 @@
 import { type DropdownItem } from '@lobehub/ui';
-import { DropdownMenu, Icon } from '@lobehub/ui';
+import { DropdownMenu, Icon, Tooltip } from '@lobehub/ui';
 import { App } from 'antd';
 import {
   BookMinusIcon,
@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 
 import RepoIcon from '@/components/LibIcon';
 import { useKnowledgeBaseListContext } from '@/features/ResourceManager/components/KnowledgeBaseListProvider';
+import { usePermission } from '@/hooks/usePermission';
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
 import { useKnowledgeBaseStore } from '@/store/library';
 
@@ -42,11 +43,14 @@ const BatchActionsDropdown = memo<BatchActionsDropdownProps>(({ selectCount, onA
   ]);
   const addFilesToKnowledgeBase = useKnowledgeBaseStore((s) => s.addFilesToKnowledgeBase);
   const knowledgeBases = useKnowledgeBaseListContext();
+  const { allowed: canEditResources, reason } = usePermission('edit_own_content');
 
   const menuItems = useMemo<DropdownItem[]>(() => {
     const items: DropdownItem[] = [];
 
     // Show delete library option only when in a knowledge base and no files selected
+    if (!canEditResources) return items;
+
     if (libraryId && selectCount === 0) {
       items.push({
         danger: true,
@@ -180,14 +184,18 @@ const BatchActionsDropdown = memo<BatchActionsDropdownProps>(({ selectCount, onA
     modal,
     message,
     knowledgeBases,
+    canEditResources,
   ]);
 
   return (
     <DropdownMenu items={menuItems} placement="bottomLeft">
-      <ActionIconWithChevron
-        icon={CircleEllipsisIcon}
-        title={t('FileManager.actions.batchActions', 'Batch actions')}
-      />
+      <Tooltip title={canEditResources ? undefined : reason}>
+        <ActionIconWithChevron
+          disabled={!canEditResources}
+          icon={CircleEllipsisIcon}
+          title={t('FileManager.actions.batchActions', 'Batch actions')}
+        />
+      </Tooltip>
     </DropdownMenu>
   );
 });

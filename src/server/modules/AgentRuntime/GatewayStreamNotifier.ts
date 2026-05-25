@@ -6,9 +6,8 @@ import {
   getDefaultReasonDetail,
   type StreamChunkData,
   type StreamEvent,
-  stripFinalStateInEventData,
 } from './StreamEventManager';
-import type { IStreamEventManager, PublishAgentRuntimeEndParams } from './types';
+import type { IStreamEventManager } from './types';
 
 const log = debug('lobe-server:agent-runtime:gateway-notifier');
 
@@ -79,25 +78,26 @@ export class GatewayStreamNotifier implements IStreamEventManager {
     return result;
   }
 
-  async publishAgentRuntimeEnd(params: PublishAgentRuntimeEndParams): Promise<string> {
-    const { operationId, stepIndex, finalState, reason, reasonDetail, uiMessages } = params;
-    const result = await this.inner.publishAgentRuntimeEnd(params);
+  async publishAgentRuntimeEnd(
+    operationId: string,
+    stepIndex: number,
+    finalState: any,
+    reason?: string,
+    reasonDetail?: string,
+  ): Promise<string> {
+    const result = await this.inner.publishAgentRuntimeEnd(
+      operationId,
+      stepIndex,
+      finalState,
+      reason,
+      reasonDetail,
+    );
 
     const effectiveReasonDetail = reasonDetail || getDefaultReasonDetail(finalState, reason);
     const errorType = finalState?.error?.type || finalState?.error?.errorType;
 
     this.pushEvent(operationId, {
-      // Forward `uiMessages` to the gateway push channel so terminal-state
-      // clients consuming /push-event get the canonical UIChatMessage[]
-      // snapshot — the final step has no later step_start to carry a fresh
-      // snapshot, so dropping it here would break the SoT contract.
-      data: {
-        errorType,
-        finalState,
-        reason,
-        reasonDetail: effectiveReasonDetail,
-        ...(uiMessages !== undefined && { uiMessages }),
-      },
+      data: { errorType, finalState, reason, reasonDetail: effectiveReasonDetail },
       operationId,
       stepIndex,
       timestamp: Date.now(),
@@ -148,18 +148,7 @@ export class GatewayStreamNotifier implements IStreamEventManager {
   // ─── Gateway HTTP helpers ───
 
   private pushEvent(operationId: string, event: Record<string, unknown>) {
-    // Mirror the Redis publisher's chokepoint — strip
-    // `finalState.messages` + tool-set fields off the gateway WS push
-    // payload too. The gateway forwards events verbatim to clients, and
-    // downstream consumers don't read these fields, so carrying them
-    // would re-introduce the same multi-megabyte serialization that
-    // crashed the xadd path.
-    const sanitizedEvent =
-      event.data === undefined ? event : { ...event, data: stripFinalStateInEventData(event.data) };
-    this.httpPost('/api/operations/push-event', {
-      event: sanitizedEvent,
-      operationId,
-    }).catch(() => {});
+    this.httpPost('/api/operations/push-event', { event, operationId }).catch(() => {});
   }
 
   /**

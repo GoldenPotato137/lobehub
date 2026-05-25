@@ -37,7 +37,6 @@ describe('thinkingResolver', () => {
       it.each([
         'gemini-2.5-flash',
         'gemini-2.5-flash-preview',
-        'gemini-3.5-flash',
         'gemini-3-flash',
         'gemini-3.0-flash',
         'flash-latest',
@@ -82,7 +81,6 @@ describe('thinkingResolver', () => {
     });
 
     it.each([
-      'gemini-3.5-flash',
       'gemini-3-pro',
       'gemini-3-pro-preview',
       'gemini-3-flash',
@@ -110,7 +108,6 @@ describe('thinkingResolver', () => {
 
     it.each([
       // Gemini 3 Pro/Flash models
-      'gemini-3.5-flash',
       'gemini-3-pro',
       'gemini-3-pro-preview',
       'gemini-3.0-pro',

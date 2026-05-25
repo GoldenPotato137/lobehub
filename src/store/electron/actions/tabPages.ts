@@ -1,8 +1,8 @@
-import { guardedMergeCache } from '@/features/Electron/titlebar/TabBar/resolveRouteMeta';
+import {
+  type CachedPageData,
+  type PageReference,
+} from '@/features/Electron/titlebar/RecentlyViewed/types';
 import { getTabPages, saveTabPages } from '@/features/Electron/titlebar/TabBar/storage';
-import { type TabItem } from '@/features/Electron/titlebar/TabBar/types';
-import { normalizeTabUrl } from '@/features/Electron/titlebar/TabBar/url';
-import { type DynamicRouteMeta } from '@/spa/router/routeMeta';
 import { type StoreSetter } from '@/store/types';
 
 import { type ElectronStore } from '../store';
@@ -11,7 +11,7 @@ import { type ElectronStore } from '../store';
 
 export interface TabPagesState {
   activeTabId: string | null;
-  tabs: TabItem[];
+  tabs: PageReference[];
 }
 
 // ======== Initial State ======== //
@@ -45,37 +45,35 @@ export class TabPagesActionImpl {
     this.#persist();
   };
 
-  addTab = (url: string, cached?: DynamicRouteMeta, activate = true): string => {
-    const id = normalizeTabUrl(url);
+  addTab = (reference: PageReference, cached?: CachedPageData, activate = true): void => {
     const { tabs } = this.#get();
-    const existing = tabs.find((t) => t.id === id);
+    const existing = tabs.find((t) => t.id === reference.id);
 
     if (existing) {
+      // Tab already exists, just activate
       if (activate) {
-        this.#set({ activeTabId: id }, false, 'activateExistingTab');
+        this.#set({ activeTabId: existing.id }, false, 'activateExistingTab');
         this.#persist();
       }
-      return id;
+      return;
     }
 
-    const newTab: TabItem = {
+    const newTab: PageReference = {
+      ...reference,
       cached,
-      id,
       lastVisited: Date.now(),
-      url,
     };
 
     const newTabs = [...tabs, newTab];
     this.#set(
-      { activeTabId: activate ? id : this.#get().activeTabId, tabs: newTabs },
+      { activeTabId: activate ? newTab.id : this.#get().activeTabId, tabs: newTabs },
       false,
       'addTab',
     );
     this.#persist();
-    return id;
   };
 
-  getActiveTab = (): TabItem | null => {
+  getActiveTab = (): PageReference | null => {
     const { activeTabId, tabs } = this.#get();
     if (!activeTabId) return null;
     return tabs.find((t) => t.id === activeTabId) ?? null;
@@ -156,40 +154,41 @@ export class TabPagesActionImpl {
     this.#persist();
   };
 
-  updateTab = (id: string, url: string): string => {
+  updateTab = (id: string, reference: PageReference, cached?: CachedPageData): void => {
     const { tabs, activeTabId } = this.#get();
     const index = tabs.findIndex((t) => t.id === id);
-    if (index < 0) return id;
+    if (index < 0) return;
 
-    const nextId = normalizeTabUrl(url);
     const prev = tabs[index];
+    // When the page type changes (e.g. agent -> home), the previous cached
+    // data (title/avatar) belongs to a different page and must not bleed
+    // through — otherwise the tab keeps showing the old page's title.
+    const sameType = prev.type === reference.type;
 
     const newTabs = [...tabs];
     newTabs[index] = {
-      ...prev,
-      cached: nextId === prev.id ? prev.cached : undefined,
-      id: nextId,
+      ...reference,
+      cached: sameType ? (cached ? { ...prev.cached, ...cached } : prev.cached) : cached,
       lastVisited: Date.now(),
-      url,
     };
 
-    const newActiveTabId = activeTabId === id ? nextId : activeTabId;
+    // Keep activeTabId in sync when the updated tab was the active one
+    const newActiveTabId = activeTabId === id ? reference.id : activeTabId;
 
     this.#set({ activeTabId: newActiveTabId, tabs: newTabs }, false, 'updateTab');
     this.#persist();
-    return nextId;
   };
 
-  updateTabCache = (id: string, cached: DynamicRouteMeta): void => {
+  updateTabCache = (id: string, cached: CachedPageData): void => {
     const { tabs } = this.#get();
     const index = tabs.findIndex((t) => t.id === id);
     if (index < 0) return;
 
-    const merged = guardedMergeCache(tabs[index].cached, cached);
-    if (merged === tabs[index].cached) return;
-
     const newTabs = [...tabs];
-    newTabs[index] = { ...newTabs[index], cached: merged };
+    newTabs[index] = {
+      ...newTabs[index],
+      cached: { ...newTabs[index].cached, ...cached },
+    };
 
     this.#set({ tabs: newTabs }, false, 'updateTabCache');
     this.#persist();

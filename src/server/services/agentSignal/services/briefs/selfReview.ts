@@ -135,12 +135,13 @@ export class AgentSignalSelfReviewBriefService {
   constructor(
     db: LobeChatDatabase,
     userId: string,
+    workspaceId: string | undefined,
     options: AgentSignalSelfReviewBriefServiceOptions = {},
   ) {
     this.db = db;
     this.userId = userId;
-    this.briefService = new BriefService(db, userId);
-    this.briefModel = new BriefModel(db, userId);
+    this.briefService = new BriefService(db, userId, workspaceId);
+    this.briefModel = new BriefModel(db, userId, workspaceId);
     this.selfReviewProposalResolver = options.selfReviewProposalResolver;
   }
 

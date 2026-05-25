@@ -7,6 +7,8 @@
   "features.gatewayMode.title": "اجرای ایجنت در سمت سرور (Gateway)",
   "features.groupChat.desc": "فعال‌سازی هماهنگی گفت‌وگوی گروهی چندعاملی.",
   "features.groupChat.title": "گفت‌وگوی گروهی (چندعاملی)",
+  "features.heterogeneousAgent.desc": "اجرای عامل‌های ناهمگون را با Claude Code، Codex CLI و سایر رابط‌های خط فرمان عامل‌های خارجی فعال می‌کند. یک گزینه «عامل Claude Code» را در منوی کناری عامل‌ها ایجاد می‌کند.",
+  "features.heterogeneousAgent.title": "عامل ناهمگون (Claude Code)",
   "features.inputMarkdown.desc": "نمایش زنده Markdown در ناحیه ورودی (متن پررنگ، بلوک‌های کد، جدول‌ها و غیره).",
   "features.inputMarkdown.title": "نمایش Markdown در ورودی",
   "features.messenger.desc": "با عوامل خود از طریق تلگرام (و سایر پیام‌رسان‌ها) از طریق ربات مشترک LobeHub صحبت کنید. یک تب پیام‌رسان در تنظیمات اضافه می‌کند برای اتصال حساب شما و انتخاب اینکه کدام عامل پیام‌ها را دریافت کند.",

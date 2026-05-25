@@ -47,7 +47,7 @@
   "claudeCode.askUserQuestion.skip": "Überspringen",
   "claudeCode.askUserQuestion.submit": "Absenden",
   "claudeCode.askUserQuestion.timeExpired": "Zeit abgelaufen — Option 1 für jede Frage wird verwendet.",
-  "claudeCode.askUserQuestion.timeRemaining": "Verbleibende Zeit: {{time}} · unbeantwortete Fragen werden bei Ablauf auf Option 1 gesetzt.",
+  "claudeCode.askUserQuestion.timeRemaining": "Verbleibende Zeit: {{time}} · unbeantwortete Fragen werden bei Zeitüberschreitung auf Option 1 gesetzt.",
   "codeInterpreter-legacy.error": "Ausführungsfehler",
   "codeInterpreter-legacy.executing": "Wird ausgeführt...",
   "codeInterpreter-legacy.files": "Dateien:",

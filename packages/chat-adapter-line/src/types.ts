@@ -145,20 +145,8 @@ export interface LineWebhookPayload {
 
 // ---------- Outbound API ----------
 
-/**
- * Outbound message shapes supported by the Messaging API push endpoint.
- * Media messages require **public HTTPS URLs** — LINE fetches the bytes
- * server-side, so inline binary upload is not an option.
- */
-export type LineOutboundMessage =
-  | { text: string; type: 'text' }
-  | { originalContentUrl: string; previewImageUrl: string; type: 'image' }
-  | { originalContentUrl: string; previewImageUrl: string; type: 'video' }
-  | { duration: number; originalContentUrl: string; type: 'audio' };
-
 export interface LinePushMessageRequest {
-  /** Per the docs, up to 5 message objects can be batched per push call. */
-  messages: LineOutboundMessage[];
+  messages: Array<{ text: string; type: 'text' }>;
   /** Optional notification disabling. */
   notificationDisabled?: boolean;
   /** Recipient: userId / groupId / roomId. */

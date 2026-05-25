@@ -742,10 +742,7 @@ describe('GatewayActionImpl', () => {
       // ...and, when invoked, fires tRPC interruptTask with the *server-side* operation id
       const [, handler] = onOperationCancel.mock.calls[0];
       await handler();
-      expect(interruptTaskSpy).toHaveBeenCalledWith({
-        operationId: 'server-op-xyz',
-        topicId: 'topic-1',
-      });
+      expect(interruptTaskSpy).toHaveBeenCalledWith({ operationId: 'server-op-xyz' });
     });
   });
 });

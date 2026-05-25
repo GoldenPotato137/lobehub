@@ -10,15 +10,21 @@ import { AiModelSourceEnum } from 'model-bank';
 import type { AiModelSelectItem, NewAiModelItem } from '../schemas';
 import { aiModels } from '../schemas';
 import type { LobeChatDatabase } from '../type';
+import { buildWorkspaceWhere } from '../utils/workspace';
 
 export class AiModelModel {
   private userId: string;
   private db: LobeChatDatabase;
+  private workspaceId?: string;
 
-  constructor(db: LobeChatDatabase, userId: string) {
+  constructor(db: LobeChatDatabase, userId: string, workspaceId?: string) {
     this.userId = userId;
     this.db = db;
+    this.workspaceId = workspaceId;
   }
+
+  private ownership = () =>
+    buildWorkspaceWhere({ userId: this.userId, workspaceId: this.workspaceId }, aiModels);
 
   /**
    * Helper method to validate if array is empty and return early if needed
@@ -37,6 +43,7 @@ export class AiModelModel {
         enabled: params.enabled ?? true, // enabled by default, but respect explicit value
         source: AiModelSourceEnum.Custom,
         userId: this.userId,
+        workspaceId: this.workspaceId,
       })
       .returning();
 
@@ -46,23 +53,17 @@ export class AiModelModel {
   delete = async (id: string, providerId: string) => {
     return this.db
       .delete(aiModels)
-      .where(
-        and(
-          eq(aiModels.id, id),
-          eq(aiModels.providerId, providerId),
-          eq(aiModels.userId, this.userId),
-        ),
-      );
+      .where(and(eq(aiModels.id, id), eq(aiModels.providerId, providerId), this.ownership()));
   };
 
   deleteAll = async () => {
-    return this.db.delete(aiModels).where(eq(aiModels.userId, this.userId));
+    return this.db.delete(aiModels).where(this.ownership());
   };
 
   query = async () => {
     return this.db.query.aiModels.findMany({
       orderBy: [desc(aiModels.updatedAt)],
-      where: eq(aiModels.userId, this.userId),
+      where: this.ownership(),
     });
   };
 
@@ -84,7 +85,7 @@ export class AiModelModel {
         type: aiModels.type,
       })
       .from(aiModels)
-      .where(and(eq(aiModels.providerId, providerId), eq(aiModels.userId, this.userId)))
+      .where(and(eq(aiModels.providerId, providerId), this.ownership()))
       .orderBy(
         asc(aiModels.sort),
         desc(aiModels.enabled),
@@ -113,21 +114,28 @@ export class AiModelModel {
         type: aiModels.type,
       })
       .from(aiModels)
-      .where(and(eq(aiModels.userId, this.userId)));
+      .where(this.ownership());
 
     return data as EnabledAiModel[];
   };
 
   findById = async (id: string) => {
     return this.db.query.aiModels.findFirst({
-      where: and(eq(aiModels.id, id), eq(aiModels.userId, this.userId)),
+      where: and(eq(aiModels.id, id), this.ownership()),
     });
   };
 
   update = async (id: string, providerId: string, value: Partial<AiModelSelectItem>) => {
     return this.db
       .insert(aiModels)
-      .values({ ...value, id, providerId, updatedAt: new Date(), userId: this.userId })
+      .values({
+        ...value,
+        id,
+        providerId,
+        updatedAt: new Date(),
+        userId: this.userId,
+        workspaceId: this.workspaceId,
+      })
       .onConflictDoUpdate({
         set: value,
         target: [aiModels.id, aiModels.providerId, aiModels.userId],
@@ -140,6 +148,7 @@ export class AiModelModel {
       ...value,
       updatedAt: now,
       userId: this.userId,
+      workspaceId: this.workspaceId,
     } as typeof aiModels.$inferInsert;
 
     if (value.type) insertValues.type = value.type;
@@ -172,6 +181,7 @@ export class AiModelModel {
       providerId,
       updatedAt: new Date(),
       userId: this.userId,
+      workspaceId: this.workspaceId,
     }));
 
     return this.db
@@ -190,15 +200,12 @@ export class AiModelModel {
     }
 
     // Get default model list to preserve type information
-    const { loadModels } = await import('@lobechat/business-model-bank/model-config');
-    const defaultModels = await loadModels();
-    const defaultModelMap = new Map(defaultModels.map((m) => [`${m.providerId}:${m.id}`, m]));
+    const { LOBE_DEFAULT_MODEL_LIST } = await import('model-bank');
+    const defaultModelMap = new Map(LOBE_DEFAULT_MODEL_LIST.map((m) => [m.id, m]));
 
     // Prepare all records for batch upsert
     const allRecords = models.map((modelId) => {
-      const defaultModel =
-        defaultModelMap.get(`${providerId}:${modelId}`) ??
-        defaultModels.find((model) => model.id === modelId);
+      const defaultModel = defaultModelMap.get(modelId);
       const record: typeof aiModels.$inferInsert = {
         enabled,
         id: modelId,
@@ -207,6 +214,7 @@ export class AiModelModel {
         source: AiModelSourceEnum.Builtin,
         updatedAt: new Date(),
         userId: this.userId,
+        workspaceId: this.workspaceId,
       };
 
       // Preserve type if available from default model list
@@ -237,7 +245,7 @@ export class AiModelModel {
         and(
           eq(aiModels.providerId, providerId),
           eq(aiModels.source, AiModelSourceEnum.Remote),
-          eq(aiModels.userId, this.userId),
+          this.ownership(),
         ),
       );
   }
@@ -245,7 +253,7 @@ export class AiModelModel {
   clearModelsByProvider(providerId: string) {
     return this.db
       .delete(aiModels)
-      .where(and(eq(aiModels.providerId, providerId), eq(aiModels.userId, this.userId)));
+      .where(and(eq(aiModels.providerId, providerId), this.ownership()));
   }
 
   updateModelsOrder = async (providerId: string, sortMap: AiModelSortMap[]) => {
@@ -265,6 +273,7 @@ export class AiModelModel {
           // source: isBuiltin ? 'builtin' : 'custom',
           updatedAt: now,
           userId: this.userId,
+          workspaceId: this.workspaceId,
         };
 
         if (type) insertValues.type = type;

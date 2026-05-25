@@ -23,8 +23,6 @@ const buildRedisConfig = (): RedisConfig | null => {
 const loadRedisProvider = async () => (await import('./redis')).IoRedisRedisProvider;
 
 const createMockedProvider = async () => {
-  const instances: Array<{ options: Record<PropertyKey, unknown>; url: string }> = [];
-
   const createPipelineMock = () => {
     const pipeMocks = {
       incr: vi.fn(),
@@ -79,10 +77,8 @@ const createMockedProvider = async () => {
     class FakeRedis {
       constructor(
         public url: string,
-        public options: Record<PropertyKey, unknown>,
-      ) {
-        instances.push({ options, url });
-      }
+        public options: any,
+      ) {}
       connect = mocks.connect;
       ping = mocks.ping;
       quit = mocks.quit;
@@ -118,7 +114,7 @@ const createMockedProvider = async () => {
 
   await provider.initialize();
 
-  return { instances, mocks, provider };
+  return { mocks, provider };
 };
 
 const shouldSkipIntegration = (error: unknown) =>
@@ -167,22 +163,6 @@ describe('integrated', (test) => {
 });
 
 describe('mocked', () => {
-  it('sets bounded ioredis connection and command timeouts', async () => {
-    const { instances, provider } = await createMockedProvider();
-
-    expect(instances).toHaveLength(1);
-    expect(instances[0]).toMatchObject({
-      options: {
-        commandTimeout: 10_000,
-        connectTimeout: 10_000,
-        maxRetriesPerRequest: 2,
-      },
-      url: 'redis://localhost:6379',
-    });
-
-    await provider.disconnect();
-  });
-
   it('normalizes set options into ioredis arguments', async () => {
     const { mocks, provider } = await createMockedProvider();
     await provider.set('key', 'value', { ex: 10, nx: true, get: true });

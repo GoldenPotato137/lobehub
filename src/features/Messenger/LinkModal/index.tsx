@@ -3,6 +3,8 @@
 import { Flexbox, Modal } from '@lobehub/ui';
 import { memo } from 'react';
 
+import { usePermission } from '@/hooks/usePermission';
+
 import type { MessengerPlatform } from '../constants';
 import DiscordLinkBody from './Discord';
 import SlackLinkBody from './Slack';
@@ -19,16 +21,20 @@ interface LinkModalProps {
 }
 
 const LinkModal = memo<LinkModalProps>(({ appId, botUsername, name, onClose, open, platform }) => {
+  const { allowed: canCreate } = usePermission('create_content');
+  const { allowed: canEdit } = usePermission('edit_own_content');
+  const disabled = !canCreate || !canEdit;
+
   const renderBody = () => {
     switch (platform) {
       case 'slack': {
-        return <SlackLinkBody />;
+        return <SlackLinkBody disabled={disabled} />;
       }
       case 'discord': {
-        return <DiscordLinkBody appId={appId} name={name} />;
+        return <DiscordLinkBody appId={appId} disabled={disabled} name={name} />;
       }
       case 'telegram': {
-        return <TelegramLinkBody botUsername={botUsername} name={name} />;
+        return <TelegramLinkBody botUsername={botUsername} disabled={disabled} name={name} />;
       }
     }
   };

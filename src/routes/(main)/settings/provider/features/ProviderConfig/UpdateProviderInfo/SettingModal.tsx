@@ -5,8 +5,8 @@ import { App } from 'antd';
 import { BrainIcon } from 'lucide-react';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
 import { useAiInfraStore } from '@/store/aiInfra/store';
 import { type AiProviderDetailItem, type UpdateAiProviderParams } from '@/types/aiProvider';
 
@@ -29,7 +29,7 @@ const CreateNewProvider = memo<CreateNewProviderProps>(({ onClose, open, initial
   ]);
 
   const { message, modal } = App.useApp();
-  const navigate = useNavigate();
+  const navigate = useWorkspaceAwareNavigate();
 
   const onFinish = async (values: UpdateAiProviderParams) => {
     setLoading(true);

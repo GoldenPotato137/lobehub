@@ -1,6 +1,5 @@
 import { SpanStatusCode } from '@lobechat/observability-otel/api';
 import { tracer } from '@lobechat/observability-otel/modules/agent-signal';
-import { isRecord } from '@lobechat/utils';
 import type { Context } from 'hono';
 
 import { getServerDB } from '@/database/server';
@@ -37,6 +36,10 @@ export interface ScheduleNightlyReviewPayload {
   /** Optional user allowlist for targeted local tests or backfills. */
   whitelist?: string[];
 }
+
+const isRecord = (value: unknown): value is Record<PropertyKey, unknown> => {
+  return typeof value === 'object' && value !== null;
+};
 
 const readPositiveInteger = (value: unknown, fallback: number) => {
   return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : fallback;

@@ -28,9 +28,6 @@ prd
 # Recordings
 .records/
 
-# Agent-gateway probe captures (local debugging dumps)
-.agent-gateway/
-
 # Temporary files
 .temp/
 temp/
@@ -99,7 +96,7 @@ sitemap*.xml
 robots.txt
 
 # Git hooks
-.githooks/prepare-commit-msg
+.husky/prepare-commit-msg
 
 # Documents and media
 *.pdf
@@ -109,7 +106,6 @@ vertex-ai-key.json
 
 # Agent tracing snapshots
 .agent-tracing/
-.llm-generation-tracing/
 
 # AI coding tools
 .local/

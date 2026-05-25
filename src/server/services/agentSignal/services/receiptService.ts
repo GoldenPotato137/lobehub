@@ -1,5 +1,4 @@
 import type { AgentSignalSource, BaseAction, ExecutorResult } from '@lobechat/agent-signal';
-import { LayersEnum } from '@lobechat/types';
 
 import { AGENT_SIGNAL_DEFAULTS } from '../constants';
 import { AGENT_SIGNAL_POLICY_ACTION_TYPES } from '../policies/types';
@@ -94,10 +93,6 @@ export interface AgentSignalReceipt {
     documentId?: string;
     /** Backing resource id for future navigation when still available. Skill ids use `documents.id`. */
     id?: string;
-    /** User memory base id for audit and fallback lookup. */
-    memoryId?: string;
-    /** User memory layer used to route memory receipts to their detail page. */
-    memoryLayer?: LayersEnum;
     /** Short summary captured at write time. */
     summary?: string;
     /** Human-readable resource title captured at write time. */
@@ -109,8 +104,6 @@ export interface AgentSignalReceipt {
   title: string;
   /** Topic where the receipt should be listed. */
   topicId: string;
-  /** Message that triggered the Agent Signal source, when known. */
-  triggerMessageId?: string;
   /** Owner used to enforce topic index isolation. */
   userId: string;
 }
@@ -243,10 +236,6 @@ const getPayloadString = (payload: Record<string, unknown>, key: string) => {
 const getClampedString = (value: string, maxLength = 96) =>
   value.length > maxLength ? `${value.slice(0, maxLength - 1)}...` : value;
 
-const isMemoryLayer = (value: unknown): value is LayersEnum => {
-  return Object.values(LayersEnum).includes(value as LayersEnum);
-};
-
 const getReceiptTarget = (
   action: BaseAction,
   result: ExecutorResult,
@@ -273,12 +262,6 @@ const getReceiptTarget = (
           ? { documentId: payload.documentId }
           : {}),
         ...(typeof payload.id === 'string' && payload.id.length > 0 ? { id: payload.id } : {}),
-        ...(type === 'memory' && typeof payload.memoryId === 'string' && payload.memoryId.length > 0
-          ? { memoryId: payload.memoryId }
-          : {}),
-        ...(type === 'memory' && isMemoryLayer(payload.memoryLayer)
-          ? { memoryLayer: payload.memoryLayer }
-          : {}),
         ...(typeof payload.summary === 'string' && payload.summary.length > 0
           ? { summary: payload.summary }
           : {}),
@@ -289,6 +272,14 @@ const getReceiptTarget = (
   }
 
   if (kind !== 'memory') return;
+
+  const message = getPayloadString(action.payload, 'message')?.trim();
+  if (!message) return;
+
+  return {
+    title: getClampedString(message),
+    type: 'memory',
+  };
 };
 
 const toReceiptKind = (
@@ -541,14 +532,6 @@ export const projectAgentSignalReceipts = ({
   if (!agentId || !topicId) return [];
 
   const actionById = new Map(actions.map((action) => [action.actionId, action]));
-  const anchorMessageId =
-    getPayloadString(payload, 'anchorMessageId') ??
-    // TODO: Remove after producers stop emitting only assistantMessageId.
-    getPayloadString(payload, 'assistantMessageId');
-  const triggerMessageId =
-    getPayloadString(payload, 'triggerMessageId') ??
-    // TODO: Remove after producers stop emitting only messageId.
-    getPayloadString(payload, 'messageId');
 
   return results.flatMap((result) => {
     if (result.status !== 'applied') return [];
@@ -565,7 +548,7 @@ export const projectAgentSignalReceipts = ({
       {
         ...visibleOutcome,
         agentId,
-        ...(anchorMessageId ? { anchorMessageId } : {}),
+        anchorMessageId: getPayloadString(payload, 'assistantMessageId'),
         createdAt: source.timestamp,
         id: `${source.sourceId}:${result.actionId}:${visibleOutcome.kind}`,
         operationId: getPayloadString(payload, 'operationId'),
@@ -573,7 +556,6 @@ export const projectAgentSignalReceipts = ({
         sourceType: source.sourceType,
         topicId,
         ...(target ? { target } : {}),
-        ...(triggerMessageId ? { triggerMessageId } : {}),
         userId,
       },
     ];

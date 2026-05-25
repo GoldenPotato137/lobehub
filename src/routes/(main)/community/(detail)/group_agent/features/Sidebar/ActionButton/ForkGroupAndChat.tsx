@@ -6,9 +6,10 @@ import { createStaticStyles } from 'antd-style';
 import { customAlphabet } from 'nanoid/non-secure';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 import urlJoin from 'url-join';
 
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
+import { usePermission } from '@/hooks/usePermission';
 import { useMarketAuth } from '@/layout/AuthProvider/MarketAuth';
 import { chatGroupService } from '@/services/chatGroup';
 import { discoverService } from '@/services/discover';
@@ -46,9 +47,10 @@ const ForkGroupAndChat = memo<{ mobile?: boolean }>(() => {
   const [isLoading, setIsLoading] = useState(false);
   const { message } = App.useApp();
   const { t } = useTranslation('discover');
-  const navigate = useNavigate();
+  const navigate = useWorkspaceAwareNavigate();
   const loadGroups = useAgentGroupStore((s) => s.loadGroups);
   const { isAuthenticated, signIn } = useMarketAuth();
+  const { allowed: canCreate } = usePermission('create_content');
 
   const meta = {
     avatar,
@@ -59,6 +61,7 @@ const ForkGroupAndChat = memo<{ mobile?: boolean }>(() => {
   };
 
   const handleForkAndChat = async () => {
+    if (!canCreate) return;
     // Check if user is authenticated
     if (!isAuthenticated) {
       try {
@@ -210,6 +213,7 @@ const ForkGroupAndChat = memo<{ mobile?: boolean }>(() => {
     <Button
       block
       className={styles.buttonGroup}
+      disabled={!canCreate}
       loading={isLoading}
       size={'large'}
       type={'primary'}

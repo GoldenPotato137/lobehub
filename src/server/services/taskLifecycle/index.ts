@@ -1,18 +1,10 @@
-import { TRACING_SCENARIOS } from '@lobechat/const';
-import type { TracingOptions } from '@lobechat/llm-generation-tracing';
 import {
   chainGenerateBrief,
   chainJudgeBriefEmit,
   chainTaskTopicHandoff,
-  GENERATE_BRIEF_PROMPT_VERSION,
   GENERATE_BRIEF_SCHEMA,
-  GENERATE_BRIEF_SCHEMA_NAME,
-  JUDGE_BRIEF_EMIT_PROMPT_VERSION,
   JUDGE_BRIEF_EMIT_SCHEMA,
-  JUDGE_BRIEF_EMIT_SCHEMA_NAME,
-  TASK_TOPIC_HANDOFF_PROMPT_VERSION,
   TASK_TOPIC_HANDOFF_SCHEMA,
-  TASK_TOPIC_HANDOFF_SCHEMA_NAME,
 } from '@lobechat/prompts';
 import type {
   BriefArtifacts,
@@ -59,7 +51,7 @@ const TERMINAL_STATUSES = new Set(['canceled', 'completed', 'failed']);
 const isTerminal = (status: string) => TERMINAL_STATUSES.has(status);
 
 // Consecutive 'error' reasons after which we stop re-arming and let the
-// urgent brief surface for human attention. Hardcoded for now (per );
+// urgent brief surface for human attention. Hardcoded for now (per LOBE-8233);
 // move to task.config later if it needs to be tunable per-task.
 const HEARTBEAT_FAILURE_FUSE = 3;
 
@@ -86,13 +78,16 @@ export class TaskLifecycleService {
   private topicModel: TopicModel;
   private userId: string;
 
-  constructor(db: LobeChatDatabase, userId: string) {
+  private workspaceId?: string;
+
+  constructor(db: LobeChatDatabase, userId: string, workspaceId?: string) {
     this.db = db;
     this.userId = userId;
-    this.taskModel = new TaskModel(db, userId);
-    this.taskTopicModel = new TaskTopicModel(db, userId);
-    this.briefModel = new BriefModel(db, userId);
-    this.topicModel = new TopicModel(db, userId);
+    this.workspaceId = workspaceId;
+    this.taskModel = new TaskModel(db, userId, workspaceId);
+    this.taskTopicModel = new TaskTopicModel(db, userId, workspaceId);
+    this.briefModel = new BriefModel(db, userId, workspaceId);
+    this.topicModel = new TopicModel(db, userId, workspaceId);
     this.systemAgentService = new SystemAgentService(db, userId);
   }
 
@@ -143,7 +138,7 @@ export class TaskLifecycleService {
 
       // 4. Synthesize a programmatic brief for the user (auto mode only).
       //    The agent-driven `createBrief` tool path stays the default until
-      //    the GrowthBook flag flips. See for the rollout plan.
+      //    the GrowthBook flag flips. See LOBE-8333 for the rollout plan.
       if (getBriefMode(currentTask) === 'auto' && currentTask && topicId && lastAssistantContent) {
         await this.synthesizeTopicBrief(
           taskId,
@@ -359,16 +354,9 @@ export class TaskLifecycleService {
         {
           messages: payload.messages as any[],
           model,
-          schema: { name: TASK_TOPIC_HANDOFF_SCHEMA_NAME, schema: TASK_TOPIC_HANDOFF_SCHEMA },
+          schema: { name: 'task_topic_handoff', schema: TASK_TOPIC_HANDOFF_SCHEMA },
         },
-        {
-          metadata: { trigger: 'task_handoff' },
-          tracing: {
-            promptVersion: TASK_TOPIC_HANDOFF_PROMPT_VERSION,
-            scenario: TRACING_SCENARIOS.TaskHandoff,
-            schemaName: TASK_TOPIC_HANDOFF_SCHEMA_NAME,
-          } satisfies TracingOptions,
-        },
+        { metadata: { trigger: 'task-handoff' } },
       );
 
       const handoff = result as {
@@ -466,16 +454,9 @@ export class TaskLifecycleService {
           {
             messages: judgePayload.messages as any[],
             model,
-            schema: { name: JUDGE_BRIEF_EMIT_SCHEMA_NAME, schema: JUDGE_BRIEF_EMIT_SCHEMA },
+            schema: { name: 'task_topic_brief_judge', schema: JUDGE_BRIEF_EMIT_SCHEMA },
           },
-          {
-            metadata: { trigger: 'task_brief_judge' },
-            tracing: {
-              promptVersion: JUDGE_BRIEF_EMIT_PROMPT_VERSION,
-              scenario: TRACING_SCENARIOS.TaskBriefJudge,
-              schemaName: JUDGE_BRIEF_EMIT_SCHEMA_NAME,
-            } satisfies TracingOptions,
-          },
+          { metadata: { trigger: 'task-brief-judge' } },
         )) as { emit?: boolean; reason?: string };
 
         decision = {
@@ -526,16 +507,9 @@ export class TaskLifecycleService {
         {
           messages: payload.messages as any[],
           model,
-          schema: { name: GENERATE_BRIEF_SCHEMA_NAME, schema: GENERATE_BRIEF_SCHEMA },
+          schema: { name: 'task_topic_brief', schema: GENERATE_BRIEF_SCHEMA },
         },
-        {
-          metadata: { trigger: 'task_brief' },
-          tracing: {
-            promptVersion: GENERATE_BRIEF_PROMPT_VERSION,
-            scenario: TRACING_SCENARIOS.TaskBrief,
-            schemaName: GENERATE_BRIEF_SCHEMA_NAME,
-          } satisfies TracingOptions,
-        },
+        { metadata: { trigger: 'task-brief' } },
       );
 
       const generated = result as { summary?: string; title?: string };
@@ -689,7 +663,7 @@ export class TaskLifecycleService {
   private async cascadeAfterAutoComplete(completedTaskId: string): Promise<void> {
     try {
       const { TaskRunnerService } = await import('@/server/services/taskRunner');
-      const runner = new TaskRunnerService(this.db, this.userId);
+      const runner = new TaskRunnerService(this.db, this.userId, this.workspaceId);
       await runner.cascadeOnCompletion(completedTaskId);
     } catch (e) {
       console.warn('[TaskLifecycle] dependency cascade failed:', e);

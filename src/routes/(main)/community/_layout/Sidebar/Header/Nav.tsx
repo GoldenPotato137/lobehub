@@ -5,10 +5,11 @@ import { McpIcon, ProviderIcon, SkillsIcon } from '@lobehub/ui/icons';
 import { Bot, Brain, ShapesIcon } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 import { type NavItemProps } from '@/features/NavPanel/components/NavItem';
 import NavItem from '@/features/NavPanel/components/NavItem';
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
 import { usePathname } from '@/libs/router/navigation';
 import { DiscoverTab } from '@/types/discover';
 import { isModifierClick } from '@/utils/navigation';
@@ -29,7 +30,7 @@ const useActiveTabKey = () => {
 
 const Nav = memo(() => {
   const tab = useActiveTabKey();
-  const navigate = useNavigate();
+  const navigate = useWorkspaceAwareNavigate();
   const { t } = useTranslation('discover');
 
   const items: Item[] = useMemo(

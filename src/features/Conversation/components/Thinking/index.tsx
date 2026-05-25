@@ -62,7 +62,6 @@ const Thinking = memo<ThinkingProps>((props) => {
         title={<Title duration={duration} showDetail={showDetail} thinking={thinking} />}
       >
         <ScrollArea
-          disableContentFit
           scrollFade
           className={styles.scrollRoot}
           contentProps={{

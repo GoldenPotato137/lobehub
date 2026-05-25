@@ -9,6 +9,7 @@ import { LogIn } from 'lucide-react';
 import { type FC, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { usePermission } from '@/hooks/usePermission';
 import { useMarketAuth } from '@/layout/AuthProvider/MarketAuth';
 import { lambdaClient, lambdaQuery } from '@/libs/trpc/client';
 
@@ -42,13 +43,17 @@ const CredsList: FC = () => {
   const [editingCred, setEditingCred] = useState<UserCredSummary | null>(null);
   const [viewingCred, setViewingCred] = useState<UserCredSummary | null>(null);
   const { isAuthenticated, isLoading: isAuthLoading, signIn } = useMarketAuth();
+  const { allowed: canManageCredentials } = usePermission('manage_provider_key');
 
   const { data, isLoading, refetch } = lambdaQuery.market.creds.list.useQuery(undefined, {
     enabled: isAuthenticated,
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => lambdaClient.market.creds.delete.mutate({ id }),
+    mutationFn: async (id: number) => {
+      if (!canManageCredentials) return;
+      await lambdaClient.market.creds.delete.mutate({ id });
+    },
     onSuccess: () => {
       refetch();
     },
@@ -97,8 +102,11 @@ const CredsList: FC = () => {
               cred={cred}
               key={cred.id}
               onDelete={(id) => deleteMutation.mutate(id)}
-              onEdit={setEditingCred}
               onView={setViewingCred}
+              onEdit={(cred) => {
+                if (!canManageCredentials) return;
+                setEditingCred(cred);
+              }}
             />
           ))}
         </Flexbox>

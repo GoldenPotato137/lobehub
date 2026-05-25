@@ -3,6 +3,7 @@ import { TRPCError } from '@trpc/server';
 import { and, asc, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 
+import { withScopedPermission } from '@/business/server/trpc-middlewares/rbacPermission';
 import {
   AgentEvalDatasetModel,
   AgentEvalRunModel,
@@ -37,18 +38,22 @@ const toIsoString = (value?: Date | null) => (value ? value.toISOString() : unde
 
 const agentEvalExternalProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
   const { ctx } = opts;
+  const wsId = ctx.workspaceId ?? undefined;
 
   return opts.next({
     ctx: {
-      datasetModel: new AgentEvalDatasetModel(ctx.serverDB, ctx.userId),
-      runModel: new AgentEvalRunModel(ctx.serverDB, ctx.userId),
-      runService: new AgentEvalRunService(ctx.serverDB, ctx.userId),
-      runTopicModel: new AgentEvalRunTopicModel(ctx.serverDB, ctx.userId),
-      testCaseModel: new AgentEvalTestCaseModel(ctx.serverDB, ctx.userId),
-      threadModel: new ThreadModel(ctx.serverDB, ctx.userId),
+      datasetModel: new AgentEvalDatasetModel(ctx.serverDB, ctx.userId, wsId),
+      runModel: new AgentEvalRunModel(ctx.serverDB, ctx.userId, wsId),
+      runService: new AgentEvalRunService(ctx.serverDB, ctx.userId, wsId),
+      runTopicModel: new AgentEvalRunTopicModel(ctx.serverDB, ctx.userId, wsId),
+      testCaseModel: new AgentEvalTestCaseModel(ctx.serverDB, ctx.userId, wsId),
+      threadModel: new ThreadModel(ctx.serverDB, ctx.userId, wsId),
     },
   });
 });
+const agentEvalExternalWriteProcedure = agentEvalExternalProcedure.use(
+  withScopedPermission('agent:update'),
+);
 
 type ReportResultInput = z.infer<typeof reportResultItemSchema> & { runId: string };
 
@@ -336,7 +341,7 @@ export const agentEvalExternalRouter = router({
       }));
     }),
 
-  reportResult: agentEvalExternalProcedure
+  reportResult: agentEvalExternalWriteProcedure
     .input(
       z.object({
         correct: z.boolean(),
@@ -349,7 +354,7 @@ export const agentEvalExternalRouter = router({
     )
     .mutation(async ({ ctx, input }) => applyReportResult(ctx, input, true)),
 
-  reportResultsBatch: agentEvalExternalProcedure
+  reportResultsBatch: agentEvalExternalWriteProcedure
     .input(z.object({ items: z.array(reportResultItemSchema).min(1), runId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const receipts = [];
@@ -390,7 +395,7 @@ export const agentEvalExternalRouter = router({
       };
     }),
 
-  runSetStatus: agentEvalExternalProcedure
+  runSetStatus: agentEvalExternalWriteProcedure
     .input(z.object({ runId: z.string(), status: runStatusSchema }))
     .mutation(async ({ ctx, input }) => {
       const run = await ctx.runModel.findById(input.runId);
@@ -449,7 +454,7 @@ export const agentEvalExternalRouter = router({
       };
     }),
 
-  runTopicReportResult: agentEvalExternalProcedure
+  runTopicReportResult: agentEvalExternalWriteProcedure
     .input(
       z.object({
         correct: z.boolean(),

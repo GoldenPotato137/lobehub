@@ -4,7 +4,7 @@ import { Trash2Icon } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useMatch, useNavigate } from 'react-router-dom';
+import { useMatch } from 'react-router-dom';
 import type { KeyedMutator } from 'swr';
 
 import type {
@@ -13,12 +13,18 @@ import type {
   ExplorerTreeNode,
 } from '@/features/ExplorerTree';
 import { ExplorerTree, FOLDER_ICON_CSS } from '@/features/ExplorerTree';
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
 import { useChatStore } from '@/store/chat';
 
 import DocumentExplorerToolbar from './DocumentExplorerToolbar';
 import { useDocumentTreeOps } from './hooks/useDocumentTreeOps';
 import type { AgentDocumentItem } from './types';
-import { isOrphanSkillBundleItem } from './types';
+import {
+  isFolderItem,
+  isManagedSkillItem,
+  isOrphanSkillBundleItem,
+  isSkillIndexItem,
+} from './types';
 import { canDropDocument } from './utils/canDrop';
 
 const PAGE_ROUTE_PATTERN = '/agent/:aid/:topicId/page/:docId?';
@@ -53,7 +59,7 @@ interface Props {
 
 const DocumentExplorerTree = memo<Props>(({ agentId, data, mutate, style }) => {
   const { t } = useTranslation(['chat', 'common']);
-  const navigate = useNavigate();
+  const navigate = useWorkspaceAwareNavigate();
   const pageMatch = useMatch(PAGE_ROUTE_PATTERN);
   const openDocument = useChatStore((s) => s.openDocument);
   const treeRef = useRef<ExplorerTreeHandle | null>(null);
@@ -69,7 +75,7 @@ const DocumentExplorerTree = memo<Props>(({ agentId, data, mutate, style }) => {
     topicId: pageMatch?.params.topicId,
   });
 
-  const documents = useMemo(() => data.filter((doc) => doc.category !== 'web'), [data]);
+  const documents = useMemo(() => data.filter((doc) => doc.sourceType !== 'web'), [data]);
 
   // AgentDocument.parentId references the parent's documentId (FK to documents.id),
   // but ExplorerTree's flat layout expects parentId to point at another node's
@@ -93,8 +99,8 @@ const DocumentExplorerTree = memo<Props>(({ agentId, data, mutate, style }) => {
       documents.map((doc) => ({
         data: doc,
         id: doc.id,
-        isFolder: doc.isFolder,
-        name: doc.isSkillIndex ? SKILL_INDEX_FILENAME : doc.title || doc.filename || '',
+        isFolder: isFolderItem(doc),
+        name: isSkillIndexItem(doc) ? SKILL_INDEX_FILENAME : doc.title || doc.filename || '',
         parentId: resolveParentRowId(doc.parentId),
       })),
     [documents, resolveParentRowId],
@@ -170,12 +176,14 @@ const DocumentExplorerTree = memo<Props>(({ agentId, data, mutate, style }) => {
   );
 
   const canDrag = useCallback(
-    (node: ExplorerTreeNode<AgentDocumentItem>) => !!node.data && node.data.category === 'document',
+    (node: ExplorerTreeNode<AgentDocumentItem>) =>
+      !!node.data && node.data.sourceType !== 'web' && !isManagedSkillItem(node.data),
     [],
   );
 
   const canRename = useCallback(
-    (node: ExplorerTreeNode<AgentDocumentItem>) => !!node.data && node.data.category === 'document',
+    (node: ExplorerTreeNode<AgentDocumentItem>) =>
+      !!node.data && node.data.sourceType !== 'web' && !isManagedSkillItem(node.data),
     [],
   );
 
@@ -186,25 +194,16 @@ const DocumentExplorerTree = memo<Props>(({ agentId, data, mutate, style }) => {
 
   const getContextMenuItems = useCallback(
     (node: ExplorerTreeNode<AgentDocumentItem>): MenuProps['items'] => {
-      const isSkill = node.data?.category === 'skill';
-      if (isSkill && !isRecoverableSkillBundle(node.data!)) {
+      if (node.data && isManagedSkillItem(node.data) && !isRecoverableSkillBundle(node.data)) {
         return [];
       }
 
       const isFolder = !!node.isFolder;
       const targetParentId = isFolder ? node.id : (node.parentId ?? null);
 
-      // Right-click on a row that's part of the current multi-selection acts
-      // on the whole selection; otherwise it targets only the right-clicked
-      // row (which matches typical file-tree UX where right-clicking outside
-      // the selection narrows the action).
-      const selectedIds = treeRef.current?.getSelectedIds() ?? [];
-      const isMulti = selectedIds.length > 1 && selectedIds.includes(node.id);
-      const deleteIds = isMulti ? selectedIds : [node.id];
-
       const items: NonNullable<MenuProps['items']> = [];
 
-      if (isFolder && !isSkill && !isMulti) {
+      if (isFolder && (!node.data || !isManagedSkillItem(node.data))) {
         items.push(
           {
             key: 'new-folder',
@@ -220,7 +219,7 @@ const DocumentExplorerTree = memo<Props>(({ agentId, data, mutate, style }) => {
         );
       }
 
-      if (!isSkill && !isMulti) {
+      if (!node.data || !isManagedSkillItem(node.data)) {
         items.push({
           key: 'rename',
           label: t('workingPanel.resources.tree.rename'),
@@ -232,10 +231,8 @@ const DocumentExplorerTree = memo<Props>(({ agentId, data, mutate, style }) => {
         danger: true,
         icon: <Trash2Icon size={14} />,
         key: 'delete',
-        label: isMulti
-          ? t('workingPanel.resources.tree.deleteSelected', { count: deleteIds.length })
-          : t('delete', { ns: 'common' }),
-        onClick: () => ops.deleteDocuments(deleteIds),
+        label: t('delete', { ns: 'common' }),
+        onClick: () => ops.deleteDocument(node.id),
       });
 
       return items;

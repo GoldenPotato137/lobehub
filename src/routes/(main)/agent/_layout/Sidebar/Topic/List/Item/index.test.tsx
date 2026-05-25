@@ -63,12 +63,33 @@ vi.mock('@/const/version', () => ({ isDesktop: false }));
 vi.mock('@/const/url', () => ({
   SESSION_CHAT_TOPIC_URL: (agentId: string, topicId: string) => `/agent/${agentId}/${topicId}`,
 }));
+vi.mock('@/features/Electron/titlebar/RecentlyViewed/plugins', () => ({
+  pluginRegistry: { parseUrl: vi.fn() },
+}));
 vi.mock('@/features/NavPanel/components/NavItem', () => ({
-  default: ({ active, title }: { active?: boolean; title?: ReactNode }) => (
-    <div data-active={String(active)} data-testid="nav-item">
+  default: ({ active, href, title }: { active?: boolean; href?: string; title?: ReactNode }) => (
+    <div data-active={String(active)} data-href={href} data-testid="nav-item">
       {title}
     </div>
   ),
+}));
+vi.mock('@/store/workspace', () => ({
+  useWorkspaceStore: (
+    selector: (state: {
+      activeWorkspaceId: string;
+      workspaces: { id: string; slug: string }[];
+    }) => unknown,
+  ) =>
+    selector({
+      activeWorkspaceId: 'workspace-1',
+      workspaces: [{ id: 'workspace-1', slug: 'team' }],
+    }),
+  workspaceSelectors: {
+    activeWorkspace: (state: {
+      activeWorkspaceId: string;
+      workspaces: { id: string; slug: string }[];
+    }) => state.workspaces.find((workspace) => workspace.id === state.activeWorkspaceId) ?? null,
+  },
 }));
 vi.mock('@/routes/(main)/agent/channel/const', () => ({
   getPlatformIcon: () => null,
@@ -140,5 +161,21 @@ describe('TopicItem active state', () => {
 
     expect(screen.getByTestId('nav-item')).toHaveAttribute('data-active', 'false');
     expect(screen.queryByTestId('topic-thread-list')).not.toBeInTheDocument();
+  });
+
+  it('prefixes the cmd-click href with the active workspace slug', () => {
+    useTopicNavigationMock.mockReturnValue({
+      isInAgentSubRoute: false,
+      isInTopicContextRoute: false,
+      navigateToTopic: vi.fn(),
+      routeTopicId: undefined,
+    });
+
+    render(<TopicItem id="tpc_test" title="Topic" />);
+
+    expect(screen.getByTestId('nav-item')).toHaveAttribute(
+      'data-href',
+      '/team/agent/agt_test/tpc_test',
+    );
   });
 });

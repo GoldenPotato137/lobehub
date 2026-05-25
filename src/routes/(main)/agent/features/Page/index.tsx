@@ -3,12 +3,13 @@
 import { Flexbox } from '@lobehub/ui';
 import { debounce } from 'es-toolkit/compat';
 import { memo, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 
 import { AutoSaveHint } from '@/features/EditorCanvas';
 import FloatingChatPanel from '@/features/FloatingChatPanel';
 import TopicCanvas from '@/features/TopicCanvas';
 import { useAutoCreateTopicDocument } from '@/features/TopicCanvas/useAutoCreateTopicDocument';
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
 import { useClientDataSWR } from '@/libs/swr';
 import HeaderSlot from '@/routes/(main)/agent/(chat)/_layout/HeaderSlot';
 import { documentService } from '@/services/document';
@@ -20,7 +21,7 @@ const TITLE_SAVE_DEBOUNCE = 500;
 
 const TopicPage = memo(() => {
   const { aid, topicId, docId } = useParams<{ aid?: string; docId?: string; topicId?: string }>();
-  const navigate = useNavigate();
+  const navigate = useWorkspaceAwareNavigate();
 
   const { documentId: topicDocumentId } = useAutoCreateTopicDocument(topicId, aid);
 

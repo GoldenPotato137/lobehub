@@ -8,6 +8,7 @@ import { createStaticStyles } from 'antd-style';
 import { type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { usePermission } from '@/hooks/usePermission';
 import { lambdaClient } from '@/libs/trpc/client';
 
 const styles = createStaticStyles(({ css }) => ({
@@ -32,11 +33,14 @@ interface FormValues {
 
 const EditMetaForm: FC<EditMetaFormProps> = ({ cred, onCancel, onSuccess }) => {
   const { t } = useTranslation('setting');
+  const { allowed: canManageCredentials } = usePermission('manage_provider_key');
   const [form] = Form.useForm<FormValues>();
 
   const updateMutation = useMutation({
-    mutationFn: (values: FormValues) => {
-      return lambdaClient.market.creds.update.mutate({
+    mutationFn: async (values: FormValues) => {
+      if (!canManageCredentials) return;
+
+      await lambdaClient.market.creds.update.mutate({
         description: values.description,
         id: cred.id,
         name: values.name,
@@ -48,6 +52,8 @@ const EditMetaForm: FC<EditMetaFormProps> = ({ cred, onCancel, onSuccess }) => {
   });
 
   const handleSubmit = (values: FormValues) => {
+    if (!canManageCredentials) return;
+
     updateMutation.mutate(values);
   };
 
@@ -66,16 +72,25 @@ const EditMetaForm: FC<EditMetaFormProps> = ({ cred, onCancel, onSuccess }) => {
         name="name"
         rules={[{ required: true, message: t('creds.form.nameRequired') }]}
       >
-        <Input />
+        <Input disabled={!canManageCredentials} />
       </Form.Item>
 
       <Form.Item label={t('creds.form.description')} name="description">
-        <Input.TextArea placeholder={t('creds.form.descriptionPlaceholder')} rows={2} />
+        <Input.TextArea
+          disabled={!canManageCredentials}
+          placeholder={t('creds.form.descriptionPlaceholder')}
+          rows={2}
+        />
       </Form.Item>
 
       <div className={styles.footer}>
         <Button onClick={onCancel}>{t('creds.form.cancel')}</Button>
-        <Button htmlType="submit" loading={updateMutation.isPending} type="primary">
+        <Button
+          disabled={!canManageCredentials}
+          htmlType="submit"
+          loading={updateMutation.isPending}
+          type="primary"
+        >
           {t('creds.form.save')}
         </Button>
       </div>

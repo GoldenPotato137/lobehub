@@ -147,7 +147,7 @@ const renderFooter = async ({
         </div>
       ) : null,
   }));
-  vi.doMock('@/features/User/UserPanel/ThemeButton', () => ({
+  vi.doMock('@/features/User/AccountPanel/AccountTrigger', () => ({
     default: () => null,
   }));
   function createFeedbackModalApi() {
@@ -214,7 +214,7 @@ afterEach(() => {
   vi.doUnmock('@lobehub/analytics/react');
   vi.doUnmock('@/components/ChangelogModal');
   vi.doUnmock('@/components/HighlightNotification');
-  vi.doUnmock('@/features/User/UserPanel/ThemeButton');
+  vi.doUnmock('@/features/User/AccountPanel/AccountTrigger');
   vi.doUnmock('@/hooks/useFeedbackModal');
   vi.doUnmock('@/hooks/useNavLayout');
   vi.doUnmock('@/store/global');

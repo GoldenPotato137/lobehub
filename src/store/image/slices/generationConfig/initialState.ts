@@ -1,6 +1,6 @@
-import type { ModelParamsSchema, RuntimeImageGenParams } from 'model-bank';
+import { type ModelParamsSchema, type RuntimeImageGenParams } from 'model-bank';
 import { extractDefaultValues, ModelProvider } from 'model-bank';
-import { nanoBanana2Parameters } from 'model-bank/imageParameters';
+import { nanoBanana2Parameters } from 'model-bank/lobehub';
 
 import { DEFAULT_IMAGE_CONFIG } from '@/const/settings';
 

@@ -4,9 +4,10 @@ import { createStaticStyles, cssVar } from 'antd-style';
 import { GlobeIcon } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import urlJoin from 'url-join';
 
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
 import { type DiscoverProviderItem } from '@/types/discover';
 
 const styles = createStaticStyles(({ css, cssVar }) => {
@@ -45,7 +46,7 @@ const styles = createStaticStyles(({ css, cssVar }) => {
 
 const ProviderItem = memo<DiscoverProviderItem>(
   ({ url, name, description, identifier, models }) => {
-    const navigate = useNavigate();
+    const navigate = useWorkspaceAwareNavigate();
     const link = urlJoin('/community/provider', identifier);
     const { t } = useTranslation(['discover', 'providers']);
 
@@ -105,7 +106,7 @@ const ProviderItem = memo<DiscoverProviderItem>(
                 rows: 3,
               }}
             >
-              {t(`${identifier}.description`, { defaultValue: description, ns: 'providers' })}
+              {t(`${identifier}.description`, { ns: 'providers' })}
             </Text>
           )}
         </Flexbox>

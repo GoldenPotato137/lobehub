@@ -130,6 +130,7 @@ const AssistantMessage = memo<AssistantMessageProps>(
         }
         messageExtra={
           <>
+            {footerRender}
             {interrupted && <InterruptedHint />}
             <AssistantMessageExtra
               content={content}
@@ -141,7 +142,6 @@ const AssistantMessage = memo<AssistantMessageProps>(
               tools={tools}
               usage={usage! || metadata}
             />
-            {footerRender}
           </>
         }
         onDoubleClick={onDoubleClick}

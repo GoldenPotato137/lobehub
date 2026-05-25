@@ -3,14 +3,6 @@ import { cleanObject } from '@lobechat/utils';
 
 import { lambdaClient } from '@/libs/trpc/client';
 
-export interface RecordTracingFeedbackParams {
-  data?: Record<string, unknown>;
-  score?: number;
-  signal: 'positive' | 'negative' | 'neutral';
-  source: string;
-  tracingId: string;
-}
-
 class AiChatService {
   sendMessageInServer = async (
     params: SendMessageServerParams,
@@ -26,12 +18,6 @@ class AiChatService {
     return lambdaClient.aiChat.outputJSON.mutate(params, {
       context: { showNotification: false },
       signal: abortController?.signal,
-    });
-  };
-
-  recordTracingFeedback = async (params: RecordTracingFeedbackParams) => {
-    return lambdaClient.llmGenerationTracing.recordFeedback.mutate(params, {
-      context: { showNotification: false },
     });
   };
 }

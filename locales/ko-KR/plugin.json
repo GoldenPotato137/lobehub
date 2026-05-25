@@ -247,7 +247,7 @@
   "builtins.lobe-page-agent.title": "문서",
   "builtins.lobe-self-feedback-intent.apiName.declareSelfFeedbackIntent": "개선 아이디어 기록",
   "builtins.lobe-self-feedback-intent.inspector.gap.proposal": "개선 제안",
-  "builtins.lobe-self-feedback-intent.inspector.memory.write": "선호도 기록",
+  "builtins.lobe-self-feedback-intent.inspector.memory.write": "선호 기록",
   "builtins.lobe-self-feedback-intent.inspector.rejected": "기록되지 않음",
   "builtins.lobe-self-feedback-intent.inspector.skill.consolidate": "방법 정리",
   "builtins.lobe-self-feedback-intent.inspector.skill.create": "새로운 방법 발견",

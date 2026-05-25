@@ -9,14 +9,16 @@ import {
 } from '@lobechat/types';
 import { TRPCError } from '@trpc/server';
 import debug from 'debug';
+import { and, eq } from 'drizzle-orm';
 import pMap from 'p-map';
 import { z } from 'zod';
 
+import { withScopedPermission } from '@/business/server/trpc-middlewares/rbacPermission';
 import { MessageModel } from '@/database/models/message';
 import { TaskModel } from '@/database/models/task';
-import { TaskTopicModel } from '@/database/models/taskTopic';
 import { ThreadModel } from '@/database/models/thread';
 import { TopicModel } from '@/database/models/topic';
+import { taskTopics, topics } from '@/database/schemas';
 import { authedProcedure, heteroAuthedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { AgentRuntimeService } from '@/server/services/agentRuntime';
@@ -146,6 +148,12 @@ const ExecAgentSchema = z
       .optional(),
     /** Whether to auto-start execution after creating operation */
     autoStart: z.boolean().optional().default(true),
+    /**
+     * Runtime of the client initiating this request.
+     * 'desktop' enables `executor: 'client'` tools (local-system, stdio MCP)
+     * to be dispatched over the Agent Gateway WS.
+     */
+    clientRuntime: z.enum(['desktop', 'web']).optional(),
     /** Explicit device ID to bind to the topic and activate for this run */
     deviceId: z.string().optional(),
     /** Optional existing message IDs to include in context */
@@ -154,20 +162,6 @@ const ExecAgentSchema = z
     fileIds: z.array(z.string()).optional(),
     /** Parent message ID for regeneration/continue (skip user message creation, branch from this message) */
     parentMessageId: z.string().optional(),
-    /**
-     * Project-level skills discovered on the device filesystem
-     * (`.agents/skills` / `.claude/skills`) by the client at request time.
-     * Surfaced in `<available_skills>` and loaded on demand via readFile.
-     */
-    projectSkills: z
-      .array(
-        z.object({
-          description: z.string().optional(),
-          name: z.string(),
-          path: z.string(),
-        }),
-      )
-      .optional(),
     /** The user input/prompt */
     prompt: z.string(),
     /**
@@ -333,12 +327,6 @@ const InterruptTaskSchema = z
     operationId: z.string().optional(),
     /** Thread ID */
     threadId: z.string().optional(),
-    /**
-     * Topic ID — required to cancel remote hetero tasks (openclaw / hermes).
-     * When provided and the topic's runningOperation has a deviceId, the server
-     * will dispatch a cancelHeteroTask tool call to kill the remote process.
-     */
-    topicId: z.string().optional(),
   })
   .refine((data) => data.threadId || data.operationId, {
     message: 'Either threadId or operationId must be provided',
@@ -371,7 +359,6 @@ const AgentStreamEventSchema = z.object({
     'agent_intervention_response',
     'step_start',
     'step_complete',
-    'notify_update',
     'error',
   ]),
 });
@@ -379,14 +366,10 @@ const AgentStreamEventSchema = z.object({
 /**
  * Schema for `aiAgent.heteroIngest` — accepts a batch of producer-side
  * `AgentStreamEvent`s from `lh hetero exec`. `topicId` is required (operationId
- * → topic reverse-lookup is unreliable per design decision).
+ * → topic reverse-lookup is unreliable per LOBE-8516 design decision).
  */
 const HeteroIngestSchema = z.object({
   agentType: z.enum(['claude-code', 'codex']),
-  /** Initial assistant placeholder message id forwarded from the sandbox env var.
-   * When present, `loadOrCreateState` uses it directly and skips the DB read of
-   * topic.metadata.runningOperation, eliminating the replica-lag race condition. */
-  assistantMessageId: z.string().min(1).optional(),
   events: z.array(AgentStreamEventSchema).min(1),
   operationId: z.string().min(1),
   topicId: z.string().min(1),
@@ -414,16 +397,21 @@ const HeteroFinishSchema = z.object({
 
 const aiAgentProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
   const { ctx } = opts;
+  const wsId = ctx.workspaceId ?? undefined;
 
   return opts.next({
     ctx: {
-      agentRuntimeService: new AgentRuntimeService(ctx.serverDB, ctx.userId),
-      aiAgentService: new AiAgentService(ctx.serverDB, ctx.userId),
-      aiChatService: new AiChatService(ctx.serverDB, ctx.userId),
-      heterogeneousAgentService: new HeterogeneousAgentService(ctx.serverDB, ctx.userId),
-      messageModel: new MessageModel(ctx.serverDB, ctx.userId),
-      threadModel: new ThreadModel(ctx.serverDB, ctx.userId),
-      topicModel: new TopicModel(ctx.serverDB, ctx.userId),
+      agentRuntimeService: new AgentRuntimeService(ctx.serverDB, ctx.userId, {
+        workspaceId: wsId,
+      }),
+      aiAgentService: new AiAgentService(ctx.serverDB, ctx.userId, { workspaceId: wsId }),
+      aiChatService: new AiChatService(ctx.serverDB, ctx.userId, wsId),
+      heterogeneousAgentService: new HeterogeneousAgentService(ctx.serverDB, ctx.userId, {
+        workspaceId: wsId,
+      }),
+      messageModel: new MessageModel(ctx.serverDB, ctx.userId, wsId),
+      threadModel: new ThreadModel(ctx.serverDB, ctx.userId, wsId),
+      topicModel: new TopicModel(ctx.serverDB, ctx.userId, wsId),
     },
   });
 });
@@ -431,15 +419,12 @@ const aiAgentProcedure = authedProcedure.use(serverDatabase).use(async (opts) =>
 // Dedicated procedure for hetero-agent ingest/finish endpoints.
 // Requires a `hetero-operation` JWT (4h expiry) — normal user tokens are rejected,
 // so only the sandbox/device that received the JWT from execAgent can call these.
-const heteroAgentProcedure = heteroAuthedProcedure.use(serverDatabase).use(async (opts) => {
-  const { ctx } = opts;
-
-  return opts.next({
-    ctx: {
-      heterogeneousAgentService: new HeterogeneousAgentService(ctx.serverDB, ctx.userId),
-    },
-  });
-});
+//
+// Note: workspaceId is not on `ctx` for this procedure (the JWT is server-to-server
+// and carries no workspace claim). Handlers must resolve wsId from the row keyed
+// by `topicId` and construct `HeterogeneousAgentService` per request.
+const heteroAgentProcedure = heteroAuthedProcedure.use(serverDatabase);
+const aiAgentWriteProcedure = aiAgentProcedure.use(withScopedPermission('message:create'));
 
 export const aiAgentRouter = router({
   /**
@@ -450,7 +435,7 @@ export const aiAgentRouter = router({
    * - The subAgentId is the worker agent that executes the task
    * - Thread messages query should not filter by agentId to include all parent messages
    */
-  createClientGroupAgentTaskThread: aiAgentProcedure
+  createClientGroupAgentTaskThread: aiAgentWriteProcedure
     .input(CreateClientGroupAgentTaskThreadSchema)
     .mutation(async ({ input, ctx }) => {
       const { groupId, instruction, parentMessageId, subAgentId, title, topicId } = input;
@@ -542,7 +527,7 @@ export const aiAgentRouter = router({
    * This endpoint is called by desktop client when runInClient=true.
    * It creates the Thread but does NOT execute the task - execution happens on client side.
    */
-  createClientTaskThread: aiAgentProcedure
+  createClientTaskThread: aiAgentWriteProcedure
     .input(CreateClientTaskThreadSchema)
     .mutation(async ({ input, ctx }) => {
       const { agentId, groupId, instruction, parentMessageId, title, topicId } = input;
@@ -624,18 +609,18 @@ export const aiAgentRouter = router({
       }
     }),
 
-  execAgent: aiAgentProcedure.input(ExecAgentSchema).mutation(async ({ input, ctx }) => {
+  execAgent: aiAgentWriteProcedure.input(ExecAgentSchema).mutation(async ({ input, ctx }) => {
     const {
       agentId,
       slug,
       prompt,
       appContext,
       autoStart = true,
+      clientRuntime,
       deviceId,
       existingMessageIds = [],
       fileIds,
       parentMessageId,
-      projectSkills,
       resumeApproval,
       trigger,
       userInterventionConfig,
@@ -648,11 +633,11 @@ export const aiAgentRouter = router({
         agentId,
         appContext,
         autoStart,
+        clientRuntime,
         deviceId,
         existingMessageIds,
         fileIds,
         parentMessageId,
-        projectSkills,
         prompt,
         // When parentMessageId is provided, this is a regeneration/continue or a
         // human-approval resume — either way, skip user message creation.
@@ -681,7 +666,7 @@ export const aiAgentRouter = router({
    * Batch execute multiple agents
    * Supports parallel or sequential execution
    */
-  execAgents: aiAgentProcedure.input(ExecAgentsSchema).mutation(async ({ input, ctx }) => {
+  execAgents: aiAgentWriteProcedure.input(ExecAgentsSchema).mutation(async ({ input, ctx }) => {
     const { tasks, parallel = true } = input;
 
     log('execAgents: %d tasks, parallel=%s', tasks.length, parallel);
@@ -773,48 +758,50 @@ export const aiAgentRouter = router({
    * 4. Trigger Supervisor Agent execution
    * 5. Return operationId for SSE connection + messages for UI sync
    */
-  execGroupAgent: aiAgentProcedure.input(ExecGroupAgentSchema).mutation(async ({ input, ctx }) => {
-    const { agentId, groupId, message, files, topicId, newTopic } = input;
+  execGroupAgent: aiAgentWriteProcedure
+    .input(ExecGroupAgentSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { agentId, groupId, message, files, topicId, newTopic } = input;
 
-    log('execGroupAgent: agentId=%s, groupId=%s', agentId, groupId);
+      log('execGroupAgent: agentId=%s, groupId=%s', agentId, groupId);
 
-    try {
-      // Execute group agent
-      const result = await ctx.aiAgentService.execGroupAgent({
-        agentId,
-        files,
-        groupId,
-        message,
-        newTopic,
-        topicId,
-      });
+      try {
+        // Execute group agent
+        const result = await ctx.aiAgentService.execGroupAgent({
+          agentId,
+          files,
+          groupId,
+          message,
+          newTopic,
+          topicId,
+        });
 
-      // Get messages and topics for UI sync
-      // Messages include the assistant message with error if operation failed to start
-      const { messages, topics } = await ctx.aiChatService.getMessagesAndTopics({
-        agentId,
-        groupId,
-        includeTopic: result.isCreateNewTopic,
-        topicId: result.topicId,
-      });
+        // Get messages and topics for UI sync
+        // Messages include the assistant message with error if operation failed to start
+        const { messages, topics } = await ctx.aiChatService.getMessagesAndTopics({
+          agentId,
+          groupId,
+          includeTopic: result.isCreateNewTopic,
+          topicId: result.topicId,
+        });
 
-      // Return result with messages/topics - includes error/success fields
-      // Frontend can check success to decide whether to connect to SSE stream
-      return { ...result, messages, topics };
-    } catch (error: any) {
-      log('execGroupAgent failed: %O', error);
+        // Return result with messages/topics - includes error/success fields
+        // Frontend can check success to decide whether to connect to SSE stream
+        return { ...result, messages, topics };
+      } catch (error: any) {
+        log('execGroupAgent failed: %O', error);
 
-      if (error instanceof TRPCError) {
-        throw error;
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+
+        throw new TRPCError({
+          cause: error,
+          code: 'INTERNAL_SERVER_ERROR',
+          message: `Failed to execute group agent: ${error.message}`,
+        });
       }
-
-      throw new TRPCError({
-        cause: error,
-        code: 'INTERNAL_SERVER_ERROR',
-        message: `Failed to execute group agent: ${error.message}`,
-      });
-    }
-  }),
+    }),
 
   /**
    * Execute SubAgent task (supports both Group and Single Agent mode)
@@ -825,7 +812,7 @@ export const aiAgentRouter = router({
    * - Group mode: pass groupId, Thread will be associated with the Group
    * - Single Agent mode: omit groupId, Thread will only be associated with the Agent
    */
-  execSubAgentTask: aiAgentProcedure
+  execSubAgentTask: aiAgentWriteProcedure
     .input(ExecSubAgentTaskSchema)
     .mutation(async ({ input, ctx }) => {
       const { agentId, groupId, instruction, parentMessageId, title, topicId, timeout } = input;
@@ -1149,23 +1136,25 @@ export const aiAgentRouter = router({
    * This endpoint interrupts a SubAgent task by threadId or operationId.
    * It updates both operation status and Thread status to cancelled state.
    */
-  interruptTask: aiAgentProcedure.input(InterruptTaskSchema).mutation(async ({ input, ctx }) => {
-    const { threadId, operationId, topicId } = input;
+  interruptTask: aiAgentWriteProcedure
+    .input(InterruptTaskSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { threadId, operationId } = input;
 
-    log('interruptTask: threadId=%s, operationId=%s, topicId=%s', threadId, operationId, topicId);
+      log('interruptTask: threadId=%s, operationId=%s', threadId, operationId);
 
-    try {
-      return await ctx.aiAgentService.interruptTask({ operationId, threadId, topicId });
-    } catch (error: any) {
-      if (error.message === 'Thread not found') {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Thread not found' });
+      try {
+        return await ctx.aiAgentService.interruptTask({ operationId, threadId });
+      } catch (error: any) {
+        if (error.message === 'Thread not found') {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Thread not found' });
+        }
+        if (error.message === 'Operation ID not found') {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Operation ID not found' });
+        }
+        throw error;
       }
-      if (error.message === 'Operation ID not found') {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Operation ID not found' });
-      }
-      throw error;
-    }
-  }),
+    }),
 
   /**
    * Ingest a batch of `AgentStreamEvent`s from a `lh hetero exec` producer
@@ -1174,7 +1163,7 @@ export const aiAgentRouter = router({
    * unchanged. Phase 2a: pub/sub only — no DB persistence (phase 2b adds it).
    */
   heteroIngest: heteroAgentProcedure.input(HeteroIngestSchema).mutation(async ({ input, ctx }) => {
-    const { agentType, assistantMessageId, events, operationId, topicId } = input;
+    const { agentType, events, operationId, topicId } = input;
 
     log(
       'heteroIngest: topic=%s op=%s type=%s count=%d',
@@ -1185,12 +1174,26 @@ export const aiAgentRouter = router({
     );
 
     try {
+      // Resolve workspaceId from the topic row so persistence writes land in
+      // the correct workspace scope. heteroAuthedProcedure carries no
+      // workspace claim, so we must look it up here per request. We bypass
+      // `TopicModel.findById` because it filters by workspace; here we need a
+      // workspace-agnostic lookup keyed only by topicId + userId.
+      const [topicRow] = await ctx.serverDB
+        .select({ workspaceId: topics.workspaceId })
+        .from(topics)
+        .where(and(eq(topics.id, topicId), eq(topics.userId, ctx.userId)))
+        .limit(1);
+      const wsId = topicRow?.workspaceId ?? undefined;
+      const heteroService = new HeterogeneousAgentService(ctx.serverDB, ctx.userId, {
+        workspaceId: wsId,
+      });
+
       // Zod's z.any() infers `data?: any`, but the wire shape always includes
       // a `data` field (may be null). Cast at the boundary instead of widening
       // the shared `AgentStreamEvent` type or the service signature.
-      await ctx.heterogeneousAgentService.heteroIngest({
+      await heteroService.heteroIngest({
         agentType,
-        assistantMessageId,
         events: events as AgentStreamEvent[],
         operationId,
         topicId,
@@ -1218,7 +1221,19 @@ export const aiAgentRouter = router({
     log('heteroFinish: topic=%s op=%s type=%s result=%s', topicId, operationId, agentType, result);
 
     try {
-      await ctx.heterogeneousAgentService.heteroFinish({
+      // Resolve workspaceId from the topic row (heteroAuthedProcedure has no
+      // workspace claim) so persistence writes land in the correct scope.
+      const [topicRow] = await ctx.serverDB
+        .select({ workspaceId: topics.workspaceId })
+        .from(topics)
+        .where(and(eq(topics.id, topicId), eq(topics.userId, ctx.userId)))
+        .limit(1);
+      const wsId = topicRow?.workspaceId ?? undefined;
+      const heteroService = new HeterogeneousAgentService(ctx.serverDB, ctx.userId, {
+        workspaceId: wsId,
+      });
+
+      await heteroService.heteroFinish({
         agentType,
         error,
         operationId,
@@ -1240,15 +1255,22 @@ export const aiAgentRouter = router({
       // topic is already in a terminal state.
       const TERMINAL_TOPIC_STATUSES = new Set(['canceled', 'completed', 'failed', 'timeout']);
       try {
-        const taskTopicModel = new TaskTopicModel(ctx.serverDB, ctx.userId);
-        const taskTopic = await taskTopicModel.findByTopicId(topicId);
-        if (taskTopic && !TERMINAL_TOPIC_STATUSES.has(taskTopic.status)) {
-          const taskModel = new TaskModel(ctx.serverDB, ctx.userId);
-          const task = await taskModel.findById(taskTopic.taskId);
+        // System-level lookup: heteroFinish is a server-to-server callback from
+        // the CLI and doesn't carry a workspace context. Resolve the task topic
+        // (and downstream models) using the row's own `workspaceId`.
+        const [taskTopicRow] = await ctx.serverDB
+          .select()
+          .from(taskTopics)
+          .where(and(eq(taskTopics.topicId, topicId), eq(taskTopics.userId, ctx.userId)))
+          .limit(1);
+        if (taskTopicRow && !TERMINAL_TOPIC_STATUSES.has(taskTopicRow.status)) {
+          const wsId = taskTopicRow.workspaceId ?? undefined;
+          const taskModel = new TaskModel(ctx.serverDB, ctx.userId, wsId);
+          const task = await taskModel.findById(taskTopicRow.taskId);
           if (task) {
             const reason =
               result === 'success' ? 'done' : result === 'cancelled' ? 'interrupted' : 'error';
-            const taskLifecycle = new TaskLifecycleService(ctx.serverDB, ctx.userId);
+            const taskLifecycle = new TaskLifecycleService(ctx.serverDB, ctx.userId, wsId);
             await taskLifecycle.onTopicComplete({
               errorMessage: error?.message,
               operationId,
@@ -1276,7 +1298,7 @@ export const aiAgentRouter = router({
     }
   }),
 
-  processHumanIntervention: aiAgentProcedure
+  processHumanIntervention: aiAgentWriteProcedure
     .input(ProcessHumanInterventionSchema)
     .mutation(async ({ input, ctx }) => {
       const { operationId, action, data, reason, stepIndex, toolMessageId } = input;
@@ -1347,25 +1369,27 @@ export const aiAgentRouter = router({
       };
     }),
 
-  startExecution: aiAgentProcedure.input(StartExecutionSchema).mutation(async ({ input, ctx }) => {
-    const { operationId, context, priority, delay } = input;
+  startExecution: aiAgentWriteProcedure
+    .input(StartExecutionSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { operationId, context, priority, delay } = input;
 
-    log('Starting execution for operation %s', operationId);
+      log('Starting execution for operation %s', operationId);
 
-    // Start execution using AgentRuntimeService
-    const result = await ctx.agentRuntimeService.startExecution({
-      context,
-      delay,
-      operationId,
-      priority,
-    });
+      // Start execution using AgentRuntimeService
+      const result = await ctx.agentRuntimeService.startExecution({
+        context,
+        delay,
+        operationId,
+        priority,
+      });
 
-    return {
-      ...result,
-      message: 'Agent execution started successfully',
-      timestamp: new Date().toISOString(),
-    };
-  }),
+      return {
+        ...result,
+        message: 'Agent execution started successfully',
+        timestamp: new Date().toISOString(),
+      };
+    }),
 
   /**
    * Update Thread status after client-side task execution completes
@@ -1373,7 +1397,7 @@ export const aiAgentRouter = router({
    * This endpoint is called by desktop client after task execution finishes.
    * It updates the Thread status and metadata similar to server-side completion.
    */
-  updateClientTaskThreadStatus: aiAgentProcedure
+  updateClientTaskThreadStatus: aiAgentWriteProcedure
     .input(UpdateClientTaskThreadStatusSchema)
     .mutation(async ({ input, ctx }) => {
       const { threadId, completionReason, error, resultContent, metadata } = input;

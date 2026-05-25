@@ -14,8 +14,7 @@
   },
   "dependencies": {
     "@lobechat/const": "workspace:*",
-    "@lobechat/prompts": "workspace:*",
-    "@lobechat/utils": "workspace:*"
+    "@lobechat/prompts": "workspace:*"
   },
   "devDependencies": {
     "@lobechat/types": "workspace:*"

@@ -298,10 +298,7 @@ export abstract class ComputerRuntime {
       if (!result.success) {
         return this.errorOutput(result, {
           error: result.error?.message,
-          exitCode: result.result?.exitCode ?? result.result?.exit_code,
           isBackground: args.background || false,
-          stderr: result.result?.stderr,
-          stdout: result.result?.stdout,
           success: false,
         });
       }
@@ -471,19 +468,10 @@ export abstract class ComputerRuntime {
     // error object, JSON.stringify(undefined) returns the value `undefined`
     // (not the string "undefined"), which collapsed downstream into an empty
     // tool-message content while pluginState still got persisted.
-    //
-    // Priority chain:
-    //   1. result.error.message (explicit error from service layer)
-    //   2. JSON.stringify(result.error) (non-Error error objects)
-    //   3. state.stderr (e.g. git commit failure — exit ≠ 0, error in stderr)
-    //   4. state.error (runtime-level error message)
-    //   5. [UNKNOWN_EXEC_ERROR] Tool execution failed (last-resort fallback)
     const errorText =
       result.error?.message ||
       (result.error !== undefined ? JSON.stringify(result.error) : undefined) ||
-      (typeof state?.stderr === 'string' ? state.stderr : undefined) ||
-      (typeof state?.error === 'string' ? state.error : undefined) ||
-      '[UNKNOWN_EXEC_ERROR] Tool execution failed';
+      'Tool execution failed';
     return {
       content: errorText,
       state,

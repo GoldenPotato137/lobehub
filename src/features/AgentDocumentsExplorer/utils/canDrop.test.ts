@@ -3,6 +3,12 @@ import { describe, expect, it } from 'vitest';
 import type { ExplorerTreeCanDropCtx, ExplorerTreeNode } from '@/features/ExplorerTree';
 
 import type { AgentDocumentItem } from '../types';
+import {
+  AGENT_SKILL_TEMPLATE_ID,
+  FOLDER_FILE_TYPE,
+  SKILL_BUNDLE_FILE_TYPE,
+  SKILL_INDEX_FILE_TYPE,
+} from '../types';
 import { canDropDocument } from './canDrop';
 
 const createDocument = (overrides: Partial<AgentDocumentItem>): AgentDocumentItem =>
@@ -11,7 +17,6 @@ const createDocument = (overrides: Partial<AgentDocumentItem>): AgentDocumentIte
     accessSelf: 0,
     accessShared: 0,
     agentId: 'agent-1',
-    category: 'document',
     content: '',
     createdAt: new Date('2026-05-09T00:00:00Z'),
     deletedAt: null,
@@ -24,9 +29,6 @@ const createDocument = (overrides: Partial<AgentDocumentItem>): AgentDocumentIte
     filename: 'document.md',
     fileType: 'custom/document',
     id: 'agent-doc-1',
-    isFolder: false,
-    isSkillBundle: false,
-    isSkillIndex: false,
     loadRules: {},
     metadata: null,
     parentId: null,
@@ -71,12 +73,7 @@ describe('canDropDocument', () => {
     const source = createNode('doc-row', createDocument({ id: 'doc-row' }));
     const target = createNode(
       'folder-row',
-      createDocument({
-        fileType: 'custom/folder',
-        id: 'folder-row',
-        isFolder: true,
-        title: 'Folder',
-      }),
+      createDocument({ fileType: FOLDER_FILE_TYPE, id: 'folder-row', title: 'Folder' }),
       { isFolder: true },
     );
 
@@ -90,13 +87,10 @@ describe('canDropDocument', () => {
     const target = createNode(
       'skill-row',
       createDocument({
-        category: 'skill',
         documentId: 'skill-bundle-doc',
-        fileType: 'skills/bundle',
+        fileType: SKILL_BUNDLE_FILE_TYPE,
         id: 'skill-row',
-        isFolder: true,
-        isSkillBundle: true,
-        templateId: 'agent-skill',
+        templateId: AGENT_SKILL_TEMPLATE_ID,
         title: 'Research Skill',
       }),
       { isFolder: true },
@@ -111,22 +105,15 @@ describe('canDropDocument', () => {
     const source = createNode(
       'skill-index-row',
       createDocument({
-        category: 'skill',
-        fileType: 'skills/index',
+        fileType: SKILL_INDEX_FILE_TYPE,
         id: 'skill-index-row',
-        isSkillIndex: true,
-        templateId: 'agent-skill',
+        templateId: AGENT_SKILL_TEMPLATE_ID,
         title: 'SKILL.md',
       }),
     );
     const target = createNode(
       'folder-row',
-      createDocument({
-        fileType: 'custom/folder',
-        id: 'folder-row',
-        isFolder: true,
-        title: 'Folder',
-      }),
+      createDocument({ fileType: FOLDER_FILE_TYPE, id: 'folder-row', title: 'Folder' }),
       { isFolder: true },
     );
 

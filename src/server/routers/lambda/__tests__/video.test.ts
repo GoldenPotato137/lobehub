@@ -9,7 +9,6 @@ import { AsyncTaskStatus } from '@/types/asyncTask';
 const {
   mockAfter,
   mockCreateVideo,
-  mockLoadModels,
   mockProcessBackgroundVideoPolling,
   mockResolveBusinessModelMapping,
   mockServerDB,
@@ -19,13 +18,11 @@ const {
   const mockServerDB = { transaction: mockTransaction };
   const mockCreateVideo = vi.fn();
   const mockAfter = vi.fn((cb: () => void) => cb());
-  const mockLoadModels = vi.fn();
   const mockProcessBackgroundVideoPolling = vi.fn().mockResolvedValue(undefined);
   const mockResolveBusinessModelMapping = vi.fn();
   return {
     mockAfter,
     mockCreateVideo,
-    mockLoadModels,
     mockProcessBackgroundVideoPolling,
     mockResolveBusinessModelMapping,
     mockServerDB,
@@ -57,9 +54,6 @@ vi.mock('@lobechat/business-model-runtime', async (importOriginal) => ({
   ...((await importOriginal()) as any),
   resolveBusinessModelMapping: (...args: [string, string]) =>
     mockResolveBusinessModelMapping(...args),
-}));
-vi.mock('@lobechat/business-model-bank/model-config', () => ({
-  loadModels: mockLoadModels,
 }));
 vi.mock('@/business/server/video-generation/getVideoFreeQuota', () => ({
   getVideoFreeQuota: vi.fn().mockResolvedValue({ remaining: 10 }),
@@ -146,15 +140,6 @@ describe('videoRouter', () => {
         resolvedModelId: model,
       }),
     );
-    mockLoadModels.mockResolvedValue([
-      {
-        abilities: {},
-        enabled: true,
-        id: 'dreamina-seedance-2-0-260128',
-        providerId: 'lobehub',
-        type: 'video',
-      },
-    ]);
   });
 
   describe('createVideo - async strategy routing', () => {

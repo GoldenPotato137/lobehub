@@ -1,4 +1,3 @@
-import type { UIChatMessage } from '@lobechat/types';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { PropsWithChildren } from 'react';
 import { createElement } from 'react';
@@ -35,14 +34,6 @@ vi.mock('@/services/agentSignal', () => ({
   },
 }));
 
-const message = (input: Partial<UIChatMessage> & { id: string; role: UIChatMessage['role'] }) =>
-  ({
-    content: '',
-    createdAt: 1,
-    updatedAt: 1,
-    ...input,
-  }) as UIChatMessage;
-
 describe('useAgentSignalReceipts', () => {
   const wrapper = ({ children }: PropsWithChildren) =>
     createElement(SWRConfig, { value: { provider: () => new Map() } }, children);
@@ -52,19 +43,11 @@ describe('useAgentSignalReceipts', () => {
     vi.useRealTimers();
   });
 
-  const renderReceiptsHook = (input: Parameters<typeof useAgentSignalReceipts>[0]) =>
-    renderHook(() => useAgentSignalReceipts(input), { wrapper });
-
-  it('groups anchored receipts by anchorMessageId', async () => {
-    const { result } = renderReceiptsHook({
-      agentId: 'agent-1',
-      displayMessages: [
-        message({ id: 'user-1', role: 'user' }),
-        message({ id: 'assistant-1', parentId: 'user-1', role: 'assistant' }),
-      ],
-      enabled: true,
-      topicId: 'topic-1',
-    });
+  it('groups receipts by anchor and keeps unanchored receipts separate', async () => {
+    const { result } = renderHook(
+      () => useAgentSignalReceipts({ agentId: 'agent-1', enabled: true, topicId: 'topic-1' }),
+      { wrapper },
+    );
 
     await waitFor(() => {
       expect(result.current.receiptsByAnchor.get('assistant-1')).toEqual([
@@ -78,154 +61,11 @@ describe('useAgentSignalReceipts', () => {
     });
   });
 
-  it('groups anchored receipts under the assistant group when the anchor is a child block', async () => {
-    vi.mocked(agentSignalService.listReceipts).mockResolvedValueOnce({
-      cursor: undefined,
-      receipts: [{ ...receipt, anchorMessageId: 'assistant-child-2', id: 'receipt-child-anchor' }],
-    });
-
-    const { result } = renderReceiptsHook({
-      agentId: 'agent-1',
-      displayMessages: [
-        message({ id: 'user-1', role: 'user' }),
-        message({
-          children: [
-            { content: 'First assistant step', id: 'assistant-child-1' },
-            { content: 'Final assistant step', id: 'assistant-child-2' },
-          ],
-          id: 'assistant-group-1',
-          parentId: 'user-1',
-          role: 'assistantGroup',
-        }),
-      ],
-      enabled: true,
-      topicId: 'topic-1',
-    });
-
-    await waitFor(() => {
-      expect(result.current.receiptsByAnchor.get('assistant-group-1')).toEqual([
-        expect.objectContaining({ id: 'receipt-child-anchor' }),
-      ]);
-    });
-    expect(result.current.receiptsByAnchor.get('assistant-child-2')).toBeUndefined();
-  });
-
-  it('groups trigger-only receipts under the assistant child message when present', async () => {
-    vi.mocked(agentSignalService.listReceipts).mockResolvedValueOnce({
-      cursor: undefined,
-      receipts: [
-        {
-          ...receipt,
-          anchorMessageId: undefined,
-          id: 'receipt-trigger',
-          triggerMessageId: 'user-1',
-        },
-      ],
-    });
-
-    const { result } = renderReceiptsHook({
-      agentId: 'agent-1',
-      displayMessages: [
-        message({ id: 'user-1', role: 'user' }),
-        message({ id: 'assistant-1', parentId: 'user-1', role: 'assistant' }),
-      ],
-      enabled: true,
-      topicId: 'topic-1',
-    });
-
-    await waitFor(() => {
-      expect(result.current.receiptsByAnchor.get('assistant-1')).toEqual([
-        expect.objectContaining({ id: 'receipt-trigger' }),
-      ]);
-    });
-    expect(result.current.receiptsByAnchor.get('user-1')).toBeUndefined();
-  });
-
-  it('groups trigger-only receipts under the assistant group child message when present', async () => {
-    vi.mocked(agentSignalService.listReceipts).mockResolvedValueOnce({
-      cursor: undefined,
-      receipts: [
-        {
-          ...receipt,
-          anchorMessageId: undefined,
-          id: 'receipt-trigger',
-          triggerMessageId: 'user-1',
-        },
-      ],
-    });
-
-    const { result } = renderReceiptsHook({
-      agentId: 'agent-1',
-      displayMessages: [
-        message({ id: 'user-1', role: 'user' }),
-        message({ id: 'assistant-group-1', parentId: 'user-1', role: 'assistantGroup' }),
-      ],
-      enabled: true,
-      topicId: 'topic-1',
-    });
-
-    await waitFor(() => {
-      expect(result.current.receiptsByAnchor.get('assistant-group-1')).toEqual([
-        expect.objectContaining({ id: 'receipt-trigger' }),
-      ]);
-    });
-    expect(result.current.receiptsByAnchor.get('user-1')).toBeUndefined();
-  });
-
-  it('groups trigger-only receipts under the trigger message when no assistant child exists', async () => {
-    vi.mocked(agentSignalService.listReceipts).mockResolvedValueOnce({
-      cursor: undefined,
-      receipts: [
-        {
-          ...receipt,
-          anchorMessageId: undefined,
-          id: 'receipt-trigger',
-          triggerMessageId: 'user-1',
-        },
-      ],
-    });
-
-    const { result } = renderReceiptsHook({
-      agentId: 'agent-1',
-      displayMessages: [message({ id: 'user-1', role: 'user' })],
-      enabled: true,
-      topicId: 'topic-1',
-    });
-
-    await waitFor(() => {
-      expect(result.current.receiptsByAnchor.get('user-1')).toEqual([
-        expect.objectContaining({ id: 'receipt-trigger' }),
-      ]);
-    });
-  });
-
-  it('does not group receipts without anchorMessageId or triggerMessageId', async () => {
-    vi.mocked(agentSignalService.listReceipts).mockResolvedValueOnce({
-      cursor: undefined,
-      receipts: [{ ...receipt, anchorMessageId: undefined, id: 'receipt-floating' }],
-    });
-
-    const { result } = renderReceiptsHook({
-      agentId: 'agent-1',
-      displayMessages: [message({ id: 'assistant-1', role: 'assistant' })],
-      enabled: true,
-      topicId: 'topic-1',
-    });
-
-    await waitFor(() => {
-      expect(agentSignalService.listReceipts).toHaveBeenCalled();
-    });
-    expect([...result.current.receiptsByAnchor.values()].flat()).toEqual([]);
-    expect('unanchoredReceipts' in result.current).toBe(false);
-  });
-
   it('does not fetch receipts when the feature flag is disabled', async () => {
-    renderReceiptsHook({
-      agentId: 'agent-1',
-      displayMessages: [],
-      enabled: false,
-      topicId: 'topic-1',
-    });
+    renderHook(
+      () => useAgentSignalReceipts({ agentId: 'agent-1', enabled: false, topicId: 'topic-1' }),
+      { wrapper },
+    );
 
     expect(agentSignalService.listReceipts).not.toHaveBeenCalled();
   });
@@ -242,12 +82,10 @@ describe('useAgentSignalReceipts', () => {
         receipts: [],
       });
 
-    renderReceiptsHook({
-      agentId: 'agent-1',
-      displayMessages: [],
-      enabled: true,
-      topicId: 'topic-1',
-    });
+    renderHook(
+      () => useAgentSignalReceipts({ agentId: 'agent-1', enabled: true, topicId: 'topic-1' }),
+      { wrapper },
+    );
 
     await act(async () => {
       await Promise.resolve();
@@ -275,12 +113,10 @@ describe('useAgentSignalReceipts', () => {
       receipts: [],
     });
 
-    renderReceiptsHook({
-      agentId: 'agent-1',
-      displayMessages: [],
-      enabled: true,
-      topicId: 'topic-1',
-    });
+    renderHook(
+      () => useAgentSignalReceipts({ agentId: 'agent-1', enabled: true, topicId: 'topic-1' }),
+      { wrapper },
+    );
 
     await act(async () => {
       await Promise.resolve();
@@ -311,12 +147,10 @@ describe('useAgentSignalReceipts', () => {
       receipts: [],
     });
 
-    renderReceiptsHook({
-      agentId: 'agent-1',
-      displayMessages: [],
-      enabled: true,
-      topicId: 'topic-1',
-    });
+    renderHook(
+      () => useAgentSignalReceipts({ agentId: 'agent-1', enabled: true, topicId: 'topic-1' }),
+      { wrapper },
+    );
 
     await act(async () => {
       await Promise.resolve();
@@ -345,7 +179,6 @@ describe('useAgentSignalReceipts', () => {
       ({ pollingSignal }) =>
         useAgentSignalReceipts({
           agentId: 'agent-1',
-          displayMessages: [],
           enabled: true,
           pollingSignal,
           topicId: 'topic-1',

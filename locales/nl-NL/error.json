@@ -154,6 +154,7 @@
   "upload.desc": "Details: {{detail}}",
   "upload.fileOnlySupportInServerMode": "De huidige implementatiemodus ondersteunt geen upload van niet-afbeeldingsbestanden. Om bestanden in {{ext}}-formaat te uploaden, schakel over naar serverdatabase-implementatie of gebruik de {{cloud}}-service.",
   "upload.networkError": "Controleer je netwerkverbinding en zorg dat de cross-origin-instellingen van de opslagservice correct zijn.",
+  "upload.permissionDenied": "Je hebt geen toestemming om bestanden in deze werkruimte te uploaden.",
   "upload.storageLimitExceeded": "Je bestandsopslag heeft de limiet van je abonnement bereikt. Upgrade je abonnement of verwijder ongebruikte bestanden om ruimte vrij te maken.",
   "upload.title": "Uploaden van bestand mislukt. Controleer je netwerkverbinding of probeer later opnieuw.",
   "upload.unknownError": "Foutreden: {{reason}}",

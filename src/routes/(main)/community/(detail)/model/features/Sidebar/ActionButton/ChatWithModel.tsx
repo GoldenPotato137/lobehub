@@ -7,8 +7,10 @@ import { createStaticStyles } from 'antd-style';
 import { ChevronDownIcon } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import urlJoin from 'url-join';
+
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
 
 import { useDetailContext } from '../../DetailProvider';
 
@@ -24,7 +26,7 @@ const ChatWithModel = memo(() => {
   const { t } = useTranslation('discover');
   const { providers = [] } = useDetailContext();
   const includeLobeHub = providers.some((item) => item.id === 'lobehub');
-  const navigate = useNavigate();
+  const navigate = useWorkspaceAwareNavigate();
   const list = providers.filter((provider) => provider.id !== 'lobehub');
 
   const items = list.map((item) => ({

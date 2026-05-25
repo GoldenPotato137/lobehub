@@ -16,6 +16,8 @@ import {
 import { type FC, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { usePermission } from '@/hooks/usePermission';
+
 import { styles } from './style';
 
 interface CredItemProps {
@@ -42,8 +44,11 @@ const typeColors: Record<string, string> = {
 const CredItem: FC<CredItemProps> = memo(({ cred, onEdit, onDelete, onView }) => {
   const { t } = useTranslation('setting');
   const { modal } = App.useApp();
+  const { allowed: canManageCredentials } = usePermission('manage_provider_key');
 
   const handleDelete = () => {
+    if (!canManageCredentials) return;
+
     modal.confirm({
       centered: true,
       content: t('creds.actions.deleteConfirm.content'),
@@ -55,7 +60,7 @@ const CredItem: FC<CredItemProps> = memo(({ cred, onEdit, onDelete, onView }) =>
     });
   };
 
-  const canView = cred.type === 'kv-env' || cred.type === 'kv-header';
+  const canView = canManageCredentials && (cred.type === 'kv-env' || cred.type === 'kv-header');
 
   const menuItems = [
     ...(canView
@@ -72,10 +77,12 @@ const CredItem: FC<CredItemProps> = memo(({ cred, onEdit, onDelete, onView }) =>
       icon: <Icon icon={Pencil} />,
       key: 'edit',
       label: t('creds.actions.edit'),
+      disabled: !canManageCredentials,
       onClick: () => onEdit(cred),
     },
     {
       danger: true,
+      disabled: !canManageCredentials,
       icon: <Icon icon={Trash2} />,
       key: 'delete',
       label: t('creds.actions.delete'),
@@ -120,7 +127,7 @@ const CredItem: FC<CredItemProps> = memo(({ cred, onEdit, onDelete, onView }) =>
       </Flexbox>
       <Flexbox horizontal align="center" gap={8} onClick={stopPropagation}>
         <DropdownMenu items={menuItems} placement="bottomRight">
-          <Button icon={MoreHorizontalIcon} />
+          <Button disabled={!canManageCredentials} icon={MoreHorizontalIcon} />
         </DropdownMenu>
       </Flexbox>
     </Flexbox>

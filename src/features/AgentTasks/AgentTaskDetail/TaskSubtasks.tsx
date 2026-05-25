@@ -7,8 +7,9 @@ import { ChevronDown, ListTodoIcon, PlayCircle, Plus } from 'lucide-react';
 import type { Key, MouseEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
+import { usePermission } from '@/hooks/usePermission';
 import { taskService } from '@/services/task';
 import { useTaskStore } from '@/store/task';
 import { taskDetailSelectors } from '@/store/task/selectors';
@@ -23,7 +24,6 @@ import TaskTriggerTag from '../features/TaskTriggerTag';
 import { useTaskContextMenuActions } from '../features/useTaskItemContextMenu';
 import AccordionArrowIcon from '../shared/AccordionArrowIcon';
 import { styles } from '../shared/style';
-import { taskDetailPath } from '../shared/taskDetailPath';
 import RunSubtasksPreview from './RunSubtasksPreview';
 
 type TaskStatus = 'backlog' | 'canceled' | 'completed' | 'failed' | 'paused' | 'running';
@@ -128,7 +128,8 @@ const toTreeData = (tree: TaskTreeNode[]): DataNode[] => {
 const TaskSubtasks = memo(() => {
   const { t } = useTranslation('chat');
   const { message, modal } = App.useApp();
-  const navigate = useNavigate();
+  const navigate = useWorkspaceAwareNavigate();
+  const { allowed: canEditTask, reason } = usePermission('create_content');
   const agentId = useTaskStore(taskDetailSelectors.activeTaskAgentId);
   const subtasks = useTaskStore(taskDetailSelectors.activeTaskSubtasks);
   const taskId = useTaskStore(taskDetailSelectors.activeTaskId);
@@ -139,6 +140,13 @@ const TaskSubtasks = memo(() => {
   const [isCreating, setIsCreating] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
   const [isPlanning, setIsPlanning] = useState(false);
+
+  const handleNavigate = useCallback(
+    (identifier: string) => {
+      navigate(`/task/${identifier}`);
+    },
+    [navigate],
+  );
 
   const subtaskMap = useMemo(() => {
     const map = new Map<string, TaskDetailSubtask>();
@@ -152,14 +160,6 @@ const TaskSubtasks = memo(() => {
     return map;
   }, [subtasks]);
 
-  const handleNavigate = useCallback(
-    (identifier: string) => {
-      const subtask = subtaskMap.get(identifier);
-      navigate(taskDetailPath(identifier, subtask?.assignee?.id ?? undefined));
-    },
-    [navigate, subtaskMap],
-  );
-
   const treeData = useMemo(() => {
     if (subtasks.length === 0) return [];
     return toTreeData(buildTree(subtasks));
@@ -167,6 +167,7 @@ const TaskSubtasks = memo(() => {
 
   const handleRightClick = useCallback(
     ({ event, node }: { event: MouseEvent; node: { key: Key } }) => {
+      if (!canEditTask) return;
       const subtask = subtaskMap.get(String(node.key));
       if (!subtask) return;
       event.preventDefault();
@@ -185,12 +186,16 @@ const TaskSubtasks = memo(() => {
         status: subtask.status,
       });
     },
-    [subtaskMap, buildItems, installKeyboardHandlers],
+    [canEditTask, subtaskMap, buildItems, installKeyboardHandlers],
   );
 
-  const toggleCreating = useCallback(() => setIsCreating((prev) => !prev), []);
+  const toggleCreating = useCallback(() => {
+    if (!canEditTask) return;
+    setIsCreating((prev) => !prev);
+  }, [canEditTask]);
 
   const handleRunAll = useCallback(async () => {
+    if (!canEditTask) return;
     if (!taskId || isPlanning) return;
     setIsPlanning(true);
     try {
@@ -242,7 +247,7 @@ const TaskSubtasks = memo(() => {
     } finally {
       setIsPlanning(false);
     }
-  }, [taskId, isPlanning, message, modal, t, runReadySubtasks]);
+  }, [canEditTask, taskId, isPlanning, message, modal, t, runReadySubtasks]);
 
   if (!taskId) return null;
 
@@ -282,17 +287,18 @@ const TaskSubtasks = memo(() => {
             </Flexbox>
             <Flexbox horizontal align="center" gap={4}>
               <ActionIcon
-                disabled={isPlanning}
+                disabled={!canEditTask || isPlanning}
                 icon={PlayCircle}
                 loading={isPlanning}
                 size="small"
-                title={t('taskDetail.runAll')}
+                title={canEditTask ? t('taskDetail.runAll') : reason}
                 onClick={handleRunAll}
               />
               <ActionIcon
+                disabled={!canEditTask}
                 icon={Plus}
                 size="small"
-                title={t('taskDetail.addSubtask')}
+                title={canEditTask ? t('taskDetail.addSubtask') : reason}
                 onClick={toggleCreating}
               />
             </Flexbox>
@@ -338,6 +344,7 @@ const TaskSubtasks = memo(() => {
             paddingBlock={4}
             paddingInline={8}
             style={{ width: 'fit-content' }}
+            title={canEditTask ? undefined : reason}
             variant="borderless"
             onClick={toggleCreating}
           >

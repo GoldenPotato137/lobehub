@@ -4,9 +4,11 @@ import { App } from 'antd';
 import { CopyPlus, PanelTop, Pencil, Trash2 } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 
 import { isDesktop } from '@/const/version';
+import { pluginRegistry } from '@/features/Electron/titlebar/RecentlyViewed/plugins';
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
+import { usePermission } from '@/hooks/usePermission';
 import { useElectronStore } from '@/store/electron';
 import { usePageStore } from '@/store/page';
 
@@ -21,12 +23,16 @@ export const useDropdownMenu = ({
 }: ActionProps): (() => MenuProps['items']) => {
   const { t } = useTranslation(['common', 'file']);
   const { message, modal } = App.useApp();
-  const navigate = useNavigate();
+  const navigate = useWorkspaceAwareNavigate();
+  const { allowed: canCreatePage } = usePermission('create_content');
+  const { allowed: canEditPage } = usePermission('edit_own_content');
   const addTab = useElectronStore((s) => s.addTab);
   const removePage = usePageStore((s) => s.removePage);
   const duplicatePage = usePageStore((s) => s.duplicatePage);
 
   const handleDelete = () => {
+    if (!canEditPage) return;
+
     modal.confirm({
       cancelText: t('cancel'),
       content: t('pageEditor.deleteConfirm.content', { ns: 'file' }),
@@ -46,6 +52,8 @@ export const useDropdownMenu = ({
   };
 
   const handleDuplicate = async () => {
+    if (!canCreatePage) return;
+
     try {
       await duplicatePage(pageId);
     } catch (error) {
@@ -64,20 +72,28 @@ export const useDropdownMenu = ({
                 label: t('pageList.actions.openInNewTab', { ns: 'file' }),
                 onClick: () => {
                   const url = `/page/${pageId}`;
-                  addTab(url);
-                  navigate(url);
+                  const reference = pluginRegistry.parseUrl(url, '');
+                  if (reference) {
+                    addTab(reference);
+                    navigate(url);
+                  }
                 },
               },
               { type: 'divider' as const },
             ]
           : []),
         {
+          disabled: !canEditPage,
           icon: <Icon icon={Pencil} />,
           key: 'rename',
           label: t('rename'),
-          onClick: () => toggleEditing(true),
+          onClick: () => {
+            if (!canEditPage) return;
+            toggleEditing(true);
+          },
         },
         {
+          disabled: !canCreatePage,
           icon: <Icon icon={CopyPlus} />,
           key: 'duplicate',
           label: t('pageList.duplicate', { ns: 'file' }),
@@ -86,12 +102,23 @@ export const useDropdownMenu = ({
         { type: 'divider' },
         {
           danger: true,
+          disabled: !canEditPage,
           icon: <Icon icon={Trash2} />,
           key: 'delete',
           label: t('delete'),
           onClick: handleDelete,
         },
       ].filter(Boolean) as MenuProps['items'],
-    [t, toggleEditing, handleDuplicate, handleDelete, pageId, addTab, navigate],
+    [
+      t,
+      toggleEditing,
+      handleDuplicate,
+      handleDelete,
+      canCreatePage,
+      canEditPage,
+      pageId,
+      addTab,
+      navigate,
+    ],
   );
 };

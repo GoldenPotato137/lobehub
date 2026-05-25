@@ -15,13 +15,7 @@ import { messengerPlatformRegistry } from '@/server/services/messenger/platforms
 import { SystemAgentService } from '@/server/services/systemAgent';
 
 import { AgentBridgeService } from './AgentBridgeService';
-import type {
-  BotMessageAttachment,
-  BotReplyLocale,
-  PlatformClient,
-  PlatformMessenger,
-  UsageStats,
-} from './platforms';
+import type { BotReplyLocale, PlatformClient, PlatformMessenger, UsageStats } from './platforms';
 import {
   getBotReplyLocale,
   getStepReactionEmoji,
@@ -43,14 +37,6 @@ const log = debug('lobe-server:bot:callback');
 
 export interface BotCallbackBody {
   applicationId: string;
-  /**
-   * Outbound attachments (images/files) extracted from the agent's final
-   * assistant message or recent tool results. Forwarded to the platform
-   * messenger so platforms with attachment support (WeChat) can deliver them
-   * alongside the reply text. Platforms without attachment support silently
-   * drop these.
-   */
-  attachments?: BotMessageAttachment[];
   content?: string;
   cost?: number;
   duration?: number;
@@ -360,8 +346,7 @@ export class BotCallbackService {
     charLimit?: number,
     canEdit = true,
   ): Promise<void> {
-    const { reason, lastAssistantContent, errorMessage, errorType, operationId, attachments } =
-      body;
+    const { reason, lastAssistantContent, errorMessage, errorType, operationId } = body;
 
     if (reason === 'error') {
       log(
@@ -386,21 +371,15 @@ export class BotCallbackService {
       return;
     }
 
-    // Skip only when there's nothing at all to send. An image/file-only reply
-    // (no text, but attachments present) is still a valid reply and must go
-    // through — silently dropping it would mean an agent that answered with
-    // just a generated image gets shown nothing on the user side.
-    //
-    // For the text leg: `!lastAssistantContent` lets whitespace-only strings
-    // ("\n", "  ") through; those collapse to empty text downstream and get
-    // rejected by Telegram as "message text is empty", silently losing the
-    // reply. Trim before testing.
-    const hasText = !!lastAssistantContent?.trim();
-    const hasAttachments = !!attachments?.length;
-    if (!hasText && !hasAttachments) {
-      log('handleCompletion: no lastAssistantContent and no attachments, skipping');
+    // `!lastAssistantContent` lets whitespace-only strings ("\n", "  ") through;
+    // those collapse to empty text downstream and get rejected by Telegram as
+    // "message text is empty", silently losing the reply. Trim before testing.
+    if (!lastAssistantContent?.trim()) {
+      log('handleCompletion: no lastAssistantContent, skipping');
       return;
     }
+
+    const msgBody = renderFinalReply(lastAssistantContent);
 
     const stats: UsageStats = {
       elapsedMs: body.duration,
@@ -410,44 +389,21 @@ export class BotCallbackService {
       totalTokens: body.totalTokens ?? 0,
     };
 
-    // Build the chunk list. Empty text → a single empty chunk so the
-    // attachment-only path still drives `deliverFirstChunk` once.
-    let chunks: string[];
-    if (hasText) {
-      const msgBody = renderFinalReply(lastAssistantContent!);
-      const formattedBody = client.formatMarkdown?.(msgBody) ?? msgBody;
-      const finalText = client.formatReply?.(formattedBody, stats) ?? formattedBody;
-      chunks = splitMessage(finalText, charLimit);
-      if (chunks.length === 0) {
-        log('handleCompletion: all chunks empty after formatting, skipping send');
-        // Even with no text we still want to deliver the attachments.
-        if (!hasAttachments) return;
-        chunks = [''];
-      }
-    } else {
-      chunks = [''];
+    const formattedBody = client.formatMarkdown?.(msgBody) ?? msgBody;
+    const finalText = client.formatReply?.(formattedBody, stats) ?? formattedBody;
+    const chunks = splitMessage(finalText, charLimit);
+
+    if (chunks.length === 0) {
+      log('handleCompletion: all chunks empty after formatting, skipping send');
+      return;
     }
 
-    // Attach outbound attachments to the *last* chunk only so we don't send
-    // the same image/file once per chunk.
-    const lastIndex = chunks.length - 1;
-    const firstChunkAttachments = lastIndex === 0 ? attachments : undefined;
-
-    await this.deliverFirstChunk(
-      messenger,
-      progressMessageId,
-      chunks[0],
-      canEdit,
-      firstChunkAttachments,
-    );
+    await this.deliverFirstChunk(messenger, progressMessageId, chunks[0], canEdit);
     // Each remaining chunk gets its own try/catch so a single transient failure
     // (rate-limit, network blip) doesn't drop everything that follows.
     for (let i = 1; i < chunks.length; i++) {
       try {
-        const isLast = i === lastIndex;
-        await messenger.createMessage(
-          isLast && attachments?.length ? { attachments, content: chunks[i] } : chunks[i],
-        );
+        await messenger.createMessage(chunks[i]);
       } catch (error) {
         log('handleCompletion: failed to send chunk %d: %O', i, error);
       }
@@ -465,20 +421,17 @@ export class BotCallbackService {
     progressMessageId: string,
     text: string,
     canEdit: boolean,
-    attachments?: BotMessageAttachment[],
   ): Promise<void> {
-    const payload = attachments && attachments.length > 0 ? { attachments, content: text } : text;
-
     if (canEdit && progressMessageId) {
       try {
-        await messenger.editMessage(progressMessageId, payload);
+        await messenger.editMessage(progressMessageId, text);
         return;
       } catch (error) {
         log('handleCompletion: editMessage failed, falling back to createMessage: %O', error);
       }
     }
     try {
-      await messenger.createMessage(payload);
+      await messenger.createMessage(text);
     } catch (error) {
       log('handleCompletion: createMessage fallback failed: %O', error);
     }

@@ -17,15 +17,12 @@ import { useTranslation } from 'react-i18next';
 import { useAgentId } from '@/features/ChatInput/hooks/useAgentId';
 import CloudRepoSwitcher from '@/features/ChatInput/RuntimeConfig/CloudRepoSwitcher';
 import GitStatus from '@/features/ChatInput/RuntimeConfig/GitStatus';
-import HeteroDeviceSwitcher from '@/features/ChatInput/RuntimeConfig/HeteroDeviceSwitcher';
 import { useRepoType } from '@/features/ChatInput/RuntimeConfig/useRepoType';
 import WorkingDirectoryContent from '@/features/ChatInput/RuntimeConfig/WorkingDirectory';
 import { useAgentStore } from '@/store/agent';
 import { agentByIdSelectors } from '@/store/agent/selectors';
 import { useChatStore } from '@/store/chat';
 import { topicSelectors } from '@/store/chat/selectors';
-import { useUserStore } from '@/store/user';
-import { labPreferSelectors } from '@/store/user/selectors';
 
 const styles = createStaticStyles(({ css }) => ({
   bar: css`
@@ -81,9 +78,6 @@ const WorkingDirectoryBar = memo(() => {
   );
   const topicWorkingDirectory = useChatStore(topicSelectors.currentTopicWorkingDirectory);
   const effectiveWorkingDirectory = topicWorkingDirectory || agentWorkingDirectory;
-  const enableExecutionDeviceSwitcher = useUserStore(
-    labPreferSelectors.enableExecutionDeviceSwitcher,
-  );
 
   const repoType = useRepoType(effectiveWorkingDirectory);
 
@@ -99,10 +93,7 @@ const WorkingDirectoryBar = memo(() => {
     if (!agentId) return null;
     return (
       <Flexbox horizontal align={'center'} className={styles.bar} justify={'space-between'}>
-        <Flexbox horizontal align={'center'} gap={4}>
-          {enableExecutionDeviceSwitcher && <HeteroDeviceSwitcher agentId={agentId} />}
-          <CloudRepoSwitcher agentId={agentId} />
-        </Flexbox>
+        <CloudRepoSwitcher agentId={agentId} />
       </Flexbox>
     );
   }
@@ -138,7 +129,6 @@ const WorkingDirectoryBar = memo(() => {
   return (
     <Flexbox horizontal align={'center'} className={styles.bar} justify={'space-between'}>
       <Flexbox horizontal align={'center'} gap={4}>
-        {enableExecutionDeviceSwitcher && <HeteroDeviceSwitcher agentId={agentId} />}
         <Popover
           content={<WorkingDirectoryContent agentId={agentId} onClose={() => setOpen(false)} />}
           open={open}

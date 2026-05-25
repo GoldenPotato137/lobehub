@@ -3,8 +3,9 @@
 import { Flexbox } from '@lobehub/ui';
 import { createStaticStyles } from 'antd-style';
 import { useEffect } from 'react';
-import { Outlet, useNavigate, useParams } from 'react-router-dom';
+import { Outlet, useParams } from 'react-router-dom';
 
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
 import { useAgentGroupStore } from '@/store/agentGroup';
 
 import { DEVTOOLS_GROUP_DETAIL, DEVTOOLS_GROUP_ID } from './fixtures';
@@ -29,7 +30,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 const DevtoolsLayout = () => {
   const { menuItems } = useDevtoolsEntries();
   const { identifier } = useParams<{ identifier: string }>();
-  const navigate = useNavigate();
+  const navigate = useWorkspaceAwareNavigate();
 
   useEffect(() => {
     const previousGroupState = useAgentGroupStore.getState();

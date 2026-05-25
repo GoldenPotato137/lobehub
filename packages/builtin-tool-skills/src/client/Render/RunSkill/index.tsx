@@ -38,15 +38,14 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 
 const RunSkill = memo<BuiltinRenderProps<ActivateSkillParams, ActivateSkillState>>(
   ({ content, pluginState }) => {
-    const { description, name, title } = pluginState || {};
-    const displayName = title || name;
+    const { description, name } = pluginState || {};
 
-    if (!displayName) return null;
+    if (!name) return null;
 
     return (
       <Flexbox className={styles.container}>
         <Flexbox className={styles.header} gap={4}>
-          <span className={styles.name}>{displayName}</span>
+          <span className={styles.name}>{name}</span>
           {description && <span className={styles.description}>{description}</span>}
         </Flexbox>
         {content && (

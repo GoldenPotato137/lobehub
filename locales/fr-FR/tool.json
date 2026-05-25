@@ -46,7 +46,7 @@
   "claudeCode.askUserQuestion.multiSelectTag": "(sélection multiple)",
   "claudeCode.askUserQuestion.skip": "Passer",
   "claudeCode.askUserQuestion.submit": "Soumettre",
-  "claudeCode.askUserQuestion.timeExpired": "Temps écoulé — utilisation de l'option 1 pour chaque question.",
+  "claudeCode.askUserQuestion.timeExpired": "Temps écoulé — option 1 utilisée pour chaque question.",
   "claudeCode.askUserQuestion.timeRemaining": "Temps restant : {{time}} · les questions sans réponse par défaut passent à l'option 1 à l'expiration.",
   "codeInterpreter-legacy.error": "Erreur d'exécution",
   "codeInterpreter-legacy.executing": "Exécution en cours...",

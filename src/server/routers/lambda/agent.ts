@@ -3,27 +3,30 @@ import { CreateAgentSchema, type KnowledgeItem } from '@lobechat/types';
 import { KnowledgeType } from '@lobechat/types';
 import { z } from 'zod';
 
+import { withScopedPermission } from '@/business/server/trpc-middlewares/rbacPermission';
+import { wsCompatProcedure } from '@/business/server/trpc-middlewares/workspaceAuth';
 import { AgentModel } from '@/database/models/agent';
 import { ChatGroupModel } from '@/database/models/chatGroup';
 import { FileModel } from '@/database/models/file';
 import { KnowledgeBaseModel } from '@/database/models/knowledgeBase';
 import { SessionModel } from '@/database/models/session';
 import { UserModel } from '@/database/models/user';
-import { authedProcedure, router } from '@/libs/trpc/lambda';
+import { router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { AgentService } from '@/server/services/agent';
 
-const agentProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
+const agentProcedure = wsCompatProcedure.use(serverDatabase).use(async (opts) => {
   const { ctx } = opts;
+  const wsId = ctx.workspaceId ?? undefined;
 
   return opts.next({
     ctx: {
-      agentModel: new AgentModel(ctx.serverDB, ctx.userId),
-      agentService: new AgentService(ctx.serverDB, ctx.userId),
-      chatGroupModel: new ChatGroupModel(ctx.serverDB, ctx.userId),
-      fileModel: new FileModel(ctx.serverDB, ctx.userId),
-      knowledgeBaseModel: new KnowledgeBaseModel(ctx.serverDB, ctx.userId),
-      sessionModel: new SessionModel(ctx.serverDB, ctx.userId),
+      agentModel: new AgentModel(ctx.serverDB, ctx.userId, wsId),
+      agentService: new AgentService(ctx.serverDB, ctx.userId, wsId),
+      chatGroupModel: new ChatGroupModel(ctx.serverDB, ctx.userId, wsId),
+      fileModel: new FileModel(ctx.serverDB, ctx.userId, wsId),
+      knowledgeBaseModel: new KnowledgeBaseModel(ctx.serverDB, ctx.userId, wsId),
+      sessionModel: new SessionModel(ctx.serverDB, ctx.userId, wsId),
     },
   });
 });
@@ -47,6 +50,7 @@ export const agentRouter = router({
    * Returns the created agent ID and session ID
    */
   createAgent: agentProcedure
+    .use(withScopedPermission('agent:create'))
     .input(
       z.object({
         config: CreateAgentSchema.optional(),
@@ -63,6 +67,7 @@ export const agentRouter = router({
     }),
 
   createAgentFiles: agentProcedure
+    .use(withScopedPermission('agent:update'))
     .input(
       z.object({
         agentId: z.string(),
@@ -75,6 +80,7 @@ export const agentRouter = router({
     }),
 
   createAgentKnowledgeBase: agentProcedure
+    .use(withScopedPermission('agent:update'))
     .input(
       z.object({
         agentId: z.string(),
@@ -96,6 +102,7 @@ export const agentRouter = router({
    * Returns only the agent ID.
    */
   createAgentOnly: agentProcedure
+    .use(withScopedPermission('agent:create'))
     .input(
       z.object({
         config: z.object({}).passthrough().optional(),
@@ -113,6 +120,7 @@ export const agentRouter = router({
     }),
 
   deleteAgentFile: agentProcedure
+    .use(withScopedPermission('agent:update'))
     .input(
       z.object({
         agentId: z.string(),
@@ -124,6 +132,7 @@ export const agentRouter = router({
     }),
 
   deleteAgentKnowledgeBase: agentProcedure
+    .use(withScopedPermission('agent:update'))
     .input(
       z.object({
         agentId: z.string(),
@@ -139,6 +148,7 @@ export const agentRouter = router({
    * Returns the new agent ID and session ID.
    */
   duplicateAgent: agentProcedure
+    .use(withScopedPermission('agent:fork'))
     .input(
       z.object({
         agentId: z.string(),
@@ -289,12 +299,14 @@ export const agentRouter = router({
    * Remove an agent and its associated session
    */
   removeAgent: agentProcedure
+    .use(withScopedPermission('agent:delete'))
     .input(z.object({ agentId: z.string() }))
     .mutation(async ({ input, ctx }) => {
       return ctx.agentModel.delete(input.agentId);
     }),
 
   toggleFile: agentProcedure
+    .use(withScopedPermission('agent:update'))
     .input(
       z.object({
         agentId: z.string(),
@@ -307,6 +319,7 @@ export const agentRouter = router({
     }),
 
   toggleKnowledgeBase: agentProcedure
+    .use(withScopedPermission('agent:update'))
     .input(
       z.object({
         agentId: z.string(),
@@ -323,6 +336,7 @@ export const agentRouter = router({
     }),
 
   updateAgentConfig: agentProcedure
+    .use(withScopedPermission('agent:update'))
     .input(
       z.object({
         agentId: z.string(),
@@ -338,6 +352,7 @@ export const agentRouter = router({
    * Pin or unpin an agent
    */
   updateAgentPinned: agentProcedure
+    .use(withScopedPermission('agent:update'))
     .input(
       z.object({
         id: z.string(),

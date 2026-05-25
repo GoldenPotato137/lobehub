@@ -3,7 +3,7 @@ import debug from 'debug';
 import { createElement, useCallback, useEffect } from 'react';
 
 import { useAgentStore } from '@/store/agent';
-import { agentByIdSelectors, chatConfigByIdSelectors } from '@/store/agent/selectors';
+import { agentByIdSelectors } from '@/store/agent/selectors';
 import { useChatStore } from '@/store/chat';
 import { topicSelectors } from '@/store/chat/selectors';
 
@@ -14,6 +14,7 @@ import {
 } from './localFileMentionIndex';
 import LocalFileIcon from './MentionMenu/LocalFileIcon';
 
+const LOCAL_SYSTEM_IDENTIFIER = 'lobe-local-system';
 const MAX_LOCAL_FILE_MENTION_ITEMS = 20;
 const log = debug('chat-input:local-file-mention');
 
@@ -24,11 +25,9 @@ export interface UseLocalFileMentionResult {
 
 export const useLocalFileMention = (): UseLocalFileMentionResult => {
   const agentId = useAgentId();
+  const agentPlugins = useAgentStore((s) => agentByIdSelectors.getAgentPluginsById(agentId)(s));
   const heterogeneousType = useAgentStore(
     (s) => agentByIdSelectors.getAgencyConfigById(agentId)(s)?.heterogeneousProvider?.type,
-  );
-  const isLocalSystemEnabled = useAgentStore(
-    chatConfigByIdSelectors.isLocalSystemEnabledById(agentId),
   );
   const agentWorkingDirectory = useAgentStore((s) =>
     agentByIdSelectors.getAgentWorkingDirectoryById(agentId)(s),
@@ -36,7 +35,8 @@ export const useLocalFileMention = (): UseLocalFileMentionResult => {
   const topicWorkingDirectory = useChatStore(topicSelectors.currentTopicWorkingDirectory);
   const workingDirectory = topicWorkingDirectory || agentWorkingDirectory;
 
-  const enableLocalFileMention = !!heterogeneousType || isLocalSystemEnabled;
+  const enableLocalFileMention =
+    !!heterogeneousType || agentPlugins.includes(LOCAL_SYSTEM_IDENTIFIER);
 
   useEffect(() => {
     if (!enableLocalFileMention) return;

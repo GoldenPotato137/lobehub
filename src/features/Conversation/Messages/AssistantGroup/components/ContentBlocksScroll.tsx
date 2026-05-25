@@ -68,7 +68,7 @@ const ContentBlocksScroll = memo<ContentBlocksScrollProps>((props) => {
   }, [assistantIdFromProps, blocksFromProps, messagesList]);
 
   const list = (
-    <Flexbox gap={variant === 'workflow' ? 8 : undefined}>
+    <Flexbox>
       {blocks.map((block) => (
         <ContentBlock
           key={block.renderKey ?? block.id}
@@ -90,7 +90,6 @@ const ContentBlocksScroll = memo<ContentBlocksScrollProps>((props) => {
 
   return (
     <ScrollArea
-      disableContentFit
       scrollFade
       className={styles.scrollRoot}
       contentProps={{
@@ -100,12 +99,6 @@ const ContentBlocksScroll = memo<ContentBlocksScrollProps>((props) => {
           fontSize: 'inherit',
           gap: 0,
           lineHeight: 'inherit',
-          paddingInlineEnd: 12,
-        },
-      }}
-      scrollbarProps={{
-        style: {
-          marginInlineEnd: 2,
         },
       }}
       viewportProps={{

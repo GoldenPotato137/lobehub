@@ -1,6 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
+import { withRbacPermission } from '@/business/server/trpc-middlewares/rbacPermission';
 import { DataImporterRepos } from '@/database/repositories/dataImporter';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
@@ -10,17 +11,20 @@ import { type ImporterEntryData, type ImportResultData } from '@/types/importer'
 
 const importProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
   const { ctx } = opts;
+  const wsId = ctx.workspaceId ?? undefined;
 
   return opts.next({
     ctx: {
-      dataImporterService: new DataImporterRepos(ctx.serverDB, ctx.userId),
+      dataImporterService: new DataImporterRepos(ctx.serverDB, ctx.userId, wsId),
       fileService: new FileService(ctx.serverDB, ctx.userId),
     },
   });
 });
 
+const workspaceImportProcedure = importProcedure.use(withRbacPermission('workspace:update:all'));
+
 export const importerRouter = router({
-  importByFile: importProcedure
+  importByFile: workspaceImportProcedure
     .input(z.object({ pathname: z.string() }))
     .mutation(async ({ input, ctx }): Promise<ImportResultData> => {
       let data: ImporterEntryData | undefined;
@@ -54,7 +58,7 @@ export const importerRouter = router({
       return result;
     }),
 
-  importByPost: importProcedure
+  importByPost: workspaceImportProcedure
     .input(
       z.object({
         data: z.object({
@@ -69,7 +73,7 @@ export const importerRouter = router({
     .mutation(async ({ input, ctx }): Promise<ImportResultData> => {
       return ctx.dataImporterService.importData(input.data);
     }),
-  importPgByPost: importProcedure
+  importPgByPost: workspaceImportProcedure
     .input(
       z.object({
         data: z.record(z.string(), z.array(z.any())),

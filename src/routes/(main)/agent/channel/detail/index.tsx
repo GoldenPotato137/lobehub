@@ -5,6 +5,7 @@ import { createStaticStyles } from 'antd-style';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { usePermission } from '@/hooks/usePermission';
 import type { SerializedPlatformDefinition } from '@/server/services/bot/platforms/types';
 import { agentBotProviderService } from '@/services/agentBotProvider';
 import { useAgentStore } from '@/store/agent';
@@ -62,15 +63,18 @@ export interface TestResult {
 interface PlatformDetailProps {
   agentId: string;
   currentConfig?: CurrentConfig;
+  disabled?: boolean;
   platformDef: SerializedPlatformDefinition;
   runtimeStatus?: BotRuntimeStatus;
 }
 
 const PlatformDetail = memo<PlatformDetailProps>(
-  ({ platformDef, agentId, currentConfig, runtimeStatus }) => {
+  ({ platformDef, agentId, currentConfig, disabled, runtimeStatus }) => {
     const { t } = useTranslation('agent');
     const { message: msg, modal } = App.useApp();
     const [form] = Form.useForm<ChannelFormValues>();
+    const { allowed: canEdit } = usePermission('edit_own_content');
+    const readOnly = disabled || !canEdit;
 
     const [
       createBotProvider,
@@ -197,6 +201,7 @@ const PlatformDetail = memo<PlatformDetailProps>(
     );
 
     const handleRefreshStatus = useCallback(async () => {
+      if (readOnly) return;
       if (!currentConfig?.enabled) return;
       setRefreshingStatus(true);
       try {
@@ -217,7 +222,7 @@ const PlatformDetail = memo<PlatformDetailProps>(
       } finally {
         setRefreshingStatus(false);
       }
-    }, [agentId, currentConfig, mapRuntimeStatusToResult, msg, refreshBotRuntimeStatus]);
+    }, [agentId, readOnly, currentConfig, mapRuntimeStatusToResult, msg, refreshBotRuntimeStatus]);
 
     // Reset form and status when switching platforms. Must NOT depend on
     // runtimeStatus — otherwise background status refreshes would wipe
@@ -277,6 +282,8 @@ const PlatformDetail = memo<PlatformDetailProps>(
     }, [currentConfig, stopConnectPolling, syncRuntimeStatus]);
 
     const handleSave = useCallback(async () => {
+      if (readOnly) return;
+
       try {
         await form.validateFields();
         const values = form.getFieldsValue(true) as ChannelFormValues;
@@ -344,10 +351,13 @@ const PlatformDetail = memo<PlatformDetailProps>(
       createBotProvider,
       updateBotProvider,
       connectCurrentBot,
+      readOnly,
     ]);
 
     const handleExternalAuth = useCallback(
       async (params: { applicationId: string; credentials: Record<string, string> }) => {
+        if (readOnly) return;
+
         setSaving(true);
         setSaveResult(undefined);
         setConnectResult(undefined);
@@ -394,12 +404,14 @@ const PlatformDetail = memo<PlatformDetailProps>(
         createBotProvider,
         updateBotProvider,
         connectCurrentBot,
+        readOnly,
         msg,
         t,
       ],
     );
 
     const handleDelete = useCallback(async () => {
+      if (readOnly) return;
       if (!currentConfig) return;
 
       modal.confirm({
@@ -416,10 +428,11 @@ const PlatformDetail = memo<PlatformDetailProps>(
         },
         title: t('channel.deleteConfirm'),
       });
-    }, [currentConfig, agentId, deleteBotProvider, msg, t, modal, form]);
+    }, [readOnly, currentConfig, agentId, deleteBotProvider, msg, t, modal, form]);
 
     const handleToggleEnable = useCallback(
       async (enabled: boolean) => {
+        if (readOnly) return;
         if (!currentConfig) return;
         try {
           setPendingEnabled(enabled);
@@ -435,10 +448,11 @@ const PlatformDetail = memo<PlatformDetailProps>(
           msg.error(t('channel.updateFailed'));
         }
       },
-      [currentConfig, agentId, updateBotProvider, connectCurrentBot, msg, t],
+      [readOnly, currentConfig, agentId, updateBotProvider, connectCurrentBot, msg, t],
     );
 
     const handleTestConnection = useCallback(async () => {
+      if (readOnly) return;
       if (!currentConfig) {
         msg.warning(t('channel.saveFirstWarning'));
         return;
@@ -460,12 +474,13 @@ const PlatformDetail = memo<PlatformDetailProps>(
       } finally {
         setTesting(false);
       }
-    }, [currentConfig, platformDef.id, testConnection, msg, t]);
+    }, [readOnly, currentConfig, platformDef.id, testConnection, msg, t]);
 
     return (
       <main className={styles.main}>
         <Header
           currentConfig={currentConfig}
+          disabled={readOnly}
           enabledValue={pendingEnabled}
           platformDef={platformDef}
           refreshingStatus={refreshingStatus}
@@ -476,6 +491,7 @@ const PlatformDetail = memo<PlatformDetailProps>(
         />
         <Body
           currentConfig={currentConfig}
+          disabled={readOnly}
           form={form}
           hasConfig={!!currentConfig}
           platformDef={platformDef}
@@ -485,6 +501,7 @@ const PlatformDetail = memo<PlatformDetailProps>(
           connectResult={connectResult}
           connecting={connecting}
           currentConfig={currentConfig}
+          disabled={readOnly}
           form={form}
           hasConfig={!!currentConfig}
           platformDef={platformDef}

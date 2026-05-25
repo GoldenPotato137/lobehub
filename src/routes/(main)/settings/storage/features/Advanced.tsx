@@ -1,9 +1,11 @@
 'use client';
 
 import { BRANDING_NAME } from '@lobechat/business-const';
+import { DEFAULT_SETTINGS } from '@lobechat/config';
 import { type FormGroupItemType } from '@lobehub/ui';
 import { Button, Form, Icon } from '@lobehub/ui';
 import { App, Switch } from 'antd';
+import isEqual from 'fast-deep-equal';
 import { HardDriveDownload, HardDriveUpload } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,18 +17,17 @@ import { configService } from '@/services/config';
 import { useChatStore } from '@/store/chat';
 import { useFileStore } from '@/store/file';
 import { useServerConfigStore } from '@/store/serverConfig';
-import { featureFlagsSelectors, serverConfigSelectors } from '@/store/serverConfig/selectors';
+import { serverConfigSelectors } from '@/store/serverConfig/selectors';
 import { useSessionStore } from '@/store/session';
 import { useToolStore } from '@/store/tool';
 import { useUserStore } from '@/store/user';
-import { userGeneralSettingsSelectors } from '@/store/user/selectors';
+import { settingsSelectors } from '@/store/user/selectors';
 
 const AdvancedActions = () => {
   const { t } = useTranslation('setting');
+  const [form] = Form.useForm();
   const { message, modal } = App.useApp();
-  const { hideDocs } = useServerConfigStore(featureFlagsSelectors);
   const enableBusinessFeatures = useServerConfigStore(serverConfigSelectors.enableBusinessFeatures);
-  const checked = useUserStore(userGeneralSettingsSelectors.telemetry);
   const [clearSessions, clearSessionGroups] = useSessionStore((s) => [
     s.clearSessions,
     s.clearSessionGroups,
@@ -37,8 +38,8 @@ const AdvancedActions = () => {
   ]);
   const [removeAllFiles] = useFileStore((s) => [s.removeAllFiles]);
   const removeAllPlugins = useToolStore((s) => s.removeAllPlugins);
-  const resetSettings = useUserStore((s) => s.resetSettings);
-  const updateGeneralConfig = useUserStore((s) => s.updateGeneralConfig);
+  const settings = useUserStore(settingsSelectors.currentSettings, isEqual);
+  const [setSettings, resetSettings] = useUserStore((s) => [s.setSettings, s.resetSettings]);
 
   const handleClear = useCallback(() => {
     modal.confirm({
@@ -58,17 +59,7 @@ const AdvancedActions = () => {
       },
       title: t('danger.clear.confirm'),
     });
-  }, [
-    clearAllMessages,
-    clearSessionGroups,
-    clearSessions,
-    clearTopics,
-    message,
-    modal,
-    removeAllFiles,
-    removeAllPlugins,
-    t,
-  ]);
+  }, []);
 
   const handleReset = useCallback(() => {
     modal.confirm({
@@ -76,11 +67,26 @@ const AdvancedActions = () => {
       okButtonProps: { danger: true },
       onOk: () => {
         resetSettings();
+        form.setFieldsValue(DEFAULT_SETTINGS);
         message.success(t('danger.reset.success'));
       },
       title: t('danger.reset.confirm'),
     });
-  }, [message, modal, resetSettings, t]);
+  }, []);
+
+  const analytics: FormGroupItemType = {
+    children: [
+      {
+        children: <Switch />,
+        desc: t('analytics.telemetry.desc', { appName: BRANDING_NAME }),
+        label: t('analytics.telemetry.title'),
+        minWidth: undefined,
+        name: ['general', 'telemetry'],
+        valuePropName: 'checked',
+      },
+    ],
+    title: t('analytics.title'),
+  };
 
   const renderExportButtonFormItem = () => {
     return {
@@ -140,34 +146,16 @@ const AdvancedActions = () => {
     ],
     title: t('storage.actions.title'),
   };
-
-  const analytics: FormGroupItemType = {
-    children: [
-      {
-        children: (
-          <Switch
-            checked={!!checked}
-            onChange={(value) => {
-              updateGeneralConfig({ telemetry: value });
-            }}
-          />
-        ),
-        desc: t('analytics.telemetry.desc', { appName: BRANDING_NAME }),
-        label: t('analytics.telemetry.title'),
-        minWidth: undefined,
-        valuePropName: 'checked',
-      },
-    ],
-    title: t('analytics.title'),
-  };
-
   return (
     <>
       <Form
         collapsible={false}
-        items={hideDocs ? [analytics, system] : [system]}
+        form={form}
+        initialValues={settings}
+        items={[analytics, system]}
         itemsType={'group'}
         variant={'filled'}
+        onValuesChange={setSettings}
         {...FORM_STYLE}
       />
       {enableBusinessFeatures && <AccountDeletion />}

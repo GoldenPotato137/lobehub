@@ -89,17 +89,24 @@ export class KnowledgeBaseSearchService {
   private searchRepo: SearchRepo;
   private documentServiceInstance?: DocumentService;
 
-  constructor(serverDB: LobeChatDatabase, userId: string) {
+  private workspaceId?: string;
+
+  constructor(serverDB: LobeChatDatabase, userId: string, workspaceId?: string) {
     this.serverDB = serverDB;
     this.userId = userId;
-    this.chunkModel = new ChunkModel(serverDB, userId);
-    this.documentModel = new DocumentModel(serverDB, userId);
-    this.fileModel = new FileModel(serverDB, userId);
-    this.searchRepo = new SearchRepo(serverDB, userId);
+    this.workspaceId = workspaceId;
+    this.chunkModel = new ChunkModel(serverDB, userId, workspaceId);
+    this.documentModel = new DocumentModel(serverDB, userId, workspaceId);
+    this.fileModel = new FileModel(serverDB, userId, workspaceId);
+    this.searchRepo = new SearchRepo(serverDB, userId, workspaceId);
   }
 
   private get documentService() {
-    this.documentServiceInstance ??= new DocumentService(this.serverDB, this.userId);
+    this.documentServiceInstance ??= new DocumentService(
+      this.serverDB,
+      this.userId,
+      this.workspaceId,
+    );
     return this.documentServiceInstance;
   }
 

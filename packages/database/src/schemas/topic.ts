@@ -19,6 +19,7 @@ import { chatGroups } from './chatGroup';
 import { documents } from './file';
 import { sessions } from './session';
 import { users } from './user';
+import { workspaces } from './workspace';
 
 export const topics = pgTable(
   'topics',
@@ -46,6 +47,7 @@ export const topics = pgTable(
       enum: ['active', 'running', 'paused', 'waitingForHuman', 'failed', 'completed', 'archived'],
     }),
     completedAt: timestamptz('completed_at'),
+    workspaceId: text('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }),
     ...timestamps,
   },
   (t) => [
@@ -58,6 +60,7 @@ export const topics = pgTable(
     index('topics_trigger_idx').on(t.trigger),
     index('topics_status_idx').on(t.status),
     index('topics_user_id_completed_at_idx').on(t.userId, t.completedAt),
+    index('topics_workspace_id_idx').on(t.workspaceId),
     index('topics_extract_status_gin_idx').using(
       'gin',
       sql`(metadata->'userMemoryExtractStatus') jsonb_path_ops`,
@@ -110,6 +113,7 @@ export const threads = pgTable(
       .notNull(),
 
     lastActiveAt: timestamptz('last_active_at').defaultNow(),
+    workspaceId: text('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }),
     ...timestamps,
   },
   (t) => [
@@ -120,6 +124,7 @@ export const threads = pgTable(
     index('threads_agent_id_idx').on(t.agentId),
     index('threads_group_id_idx').on(t.groupId),
     index('threads_parent_thread_id_idx').on(t.parentThreadId),
+    index('threads_workspace_id_idx').on(t.workspaceId),
   ],
 );
 
@@ -144,6 +149,7 @@ export const topicDocuments = pgTable(
     userId: text('user_id')
       .references(() => users.id, { onDelete: 'cascade' })
       .notNull(),
+    workspaceId: text('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }),
 
     createdAt: createdAt(),
   },
@@ -152,6 +158,7 @@ export const topicDocuments = pgTable(
     index('topic_documents_user_id_idx').on(t.userId),
     index('topic_documents_topic_id_idx').on(t.topicId),
     index('topic_documents_document_id_idx').on(t.documentId),
+    index('topic_documents_workspace_id_idx').on(t.workspaceId),
   ],
 );
 
@@ -175,6 +182,7 @@ export const topicShares = pgTable(
     userId: text('user_id')
       .references(() => users.id, { onDelete: 'cascade' })
       .notNull(),
+    workspaceId: text('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }),
 
     visibility: text('visibility').default('private').notNull(), // 'private' | 'link'
 
@@ -185,6 +193,7 @@ export const topicShares = pgTable(
   (t) => [
     uniqueIndex('topic_shares_topic_id_unique').on(t.topicId),
     index('topic_shares_user_id_idx').on(t.userId),
+    index('topic_shares_workspace_id_idx').on(t.workspaceId),
   ],
 );
 

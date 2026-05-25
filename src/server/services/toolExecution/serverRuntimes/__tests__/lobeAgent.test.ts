@@ -13,18 +13,6 @@ const mockMessageModelQuery = vi.hoisted(() => vi.fn());
 const mockChat = vi.hoisted(() => vi.fn());
 const mockInitModelRuntimeFromDB = vi.hoisted(() => vi.fn());
 const mockConsumeStreamUntilDone = vi.hoisted(() => vi.fn());
-const mockBuiltinModels = vi.hoisted(() => [
-  {
-    abilities: { video: true, vision: true },
-    id: 'vision-model',
-    providerId: 'test-provider',
-  },
-  {
-    abilities: { video: false, vision: true },
-    id: 'image-only-model',
-    providerId: 'test-provider',
-  },
-]);
 
 vi.mock('@/envs/tools', () => ({
   toolsEnv: mockToolsEnv,
@@ -51,12 +39,19 @@ vi.mock('@lobechat/model-runtime', () => ({
   consumeStreamUntilDone: (...args: any[]) => mockConsumeStreamUntilDone(...args),
 }));
 
-vi.mock('@/business/client/model-bank/loadModels', () => ({
-  loadModels: vi.fn().mockResolvedValue(mockBuiltinModels),
-}));
-
 vi.mock('model-bank', () => ({
-  LOBE_DEFAULT_MODEL_LIST: mockBuiltinModels,
+  LOBE_DEFAULT_MODEL_LIST: [
+    {
+      abilities: { video: true, vision: true },
+      id: 'vision-model',
+      providerId: 'test-provider',
+    },
+    {
+      abilities: { video: false, vision: true },
+      id: 'image-only-model',
+      providerId: 'test-provider',
+    },
+  ],
 }));
 
 const { lobeAgentRuntime } = await import('../lobeAgent');

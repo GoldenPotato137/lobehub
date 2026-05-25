@@ -14,7 +14,6 @@ import {
 } from '@lobechat/prompts';
 import type { ChatToolPayload, MessageToolCall, ModelUsage } from '@lobechat/types';
 import { RequestTrigger } from '@lobechat/types';
-import { isTrimmedNonEmptyString, toRecord } from '@lobechat/utils';
 
 import type { NightlyReviewContext } from './review/collect';
 import type { SelfReviewIdea, SelfReviewProposalBaseSnapshot } from './review/proposal';
@@ -461,11 +460,15 @@ const createRuntimePrompt = (input: ExecuteSelfIterationInput) =>
     window: getIterationWindow(input),
   });
 
-const toNullableString = (value: unknown) => (isTrimmedNonEmptyString(value) ? value : undefined);
+const toNullableString = (value: unknown) =>
+  typeof value === 'string' && value.trim().length > 0 ? value : undefined;
 
 const toBoolean = (value: unknown) => (typeof value === 'boolean' ? value : undefined);
 
-const toRecordOrEmpty = (value: unknown) => toRecord(value) ?? {};
+const toRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 
 const toUnknownArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 
@@ -475,7 +478,7 @@ const toStringArray = (value: unknown) =>
 const toEvidenceRefs = (value: unknown): EvidenceRef[] =>
   Array.isArray(value)
     ? value.flatMap((item) => {
-        const record = toRecordOrEmpty(item);
+        const record = toRecord(item);
         const id = toNullableString(record.id);
         const type = toNullableString(record.type);
 
@@ -516,7 +519,7 @@ const toRisk = (value: unknown): Risk => {
 };
 
 const toTarget = (value: unknown): ActionTarget | undefined => {
-  const record = toRecordOrEmpty(value);
+  const record = toRecord(value);
   const target: ActionTarget = {
     memoryId: toNullableString(record.memoryId),
     skillDocumentId: toNullableString(record.skillDocumentId),
@@ -533,7 +536,7 @@ const toTarget = (value: unknown): ActionTarget | undefined => {
 
 const normalizeProposalActions = (value: unknown) =>
   toUnknownArray(value).map((item) => {
-    const record = toRecordOrEmpty(item);
+    const record = toRecord(item);
 
     return {
       ...record,
@@ -582,7 +585,7 @@ const toSelfFeedbackIntent = (args: Record<string, unknown>): SelfFeedbackIntent
   downgradeReason: toDowngradeReason(args.downgradeReason),
   intentType: toIntentType(args.intentType),
   mode: 'reflection',
-  operation: toRecordOrEmpty(args.operation) as SelfFeedbackIntent['operation'],
+  operation: toRecord(args.operation) as SelfFeedbackIntent['operation'],
   urgency: toUrgency(args.urgency),
 });
 
@@ -603,7 +606,7 @@ const parseToolArguments = (value: string | undefined): Record<string, unknown> 
   try {
     const parsed = JSON.parse(value) as unknown;
 
-    return toRecordOrEmpty(parsed);
+    return toRecord(parsed);
   } catch {
     return {};
   }
@@ -681,7 +684,7 @@ const withUser = <TInput extends ToolWriteInput>(
   }) as TInput;
 
 const toBaseSnapshot = (value: unknown): SelfReviewProposalBaseSnapshot => {
-  const record = toRecordOrEmpty(value);
+  const record = toRecord(value);
 
   return {
     absent: toBoolean(record.absent),
@@ -816,7 +819,7 @@ const executeRuntimeTool = async (
           toolCall.id,
           {
             actions: normalizeProposalActions(args.actions),
-            metadata: toRecordOrEmpty(args.metadata),
+            metadata: toRecord(args.metadata),
           },
         ),
       ),

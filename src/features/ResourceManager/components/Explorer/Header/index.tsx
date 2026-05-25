@@ -8,6 +8,7 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import NavHeader from '@/features/NavHeader';
+import { usePermission } from '@/hooks/usePermission';
 import { useResourceManagerStore } from '@/routes/(main)/resource/features/store';
 import { getExplorerSelectedCount } from '@/routes/(main)/resource/features/store/selectors';
 import { useFileStore } from '@/store/file';
@@ -36,6 +37,7 @@ const Header = memo(() => {
       s.selectAllState,
       s.selectedFileIds,
     ]);
+  const { allowed: canEditResources, reason } = usePermission('edit_own_content');
   const total = useFileStore((s) => s.total);
   const selectCount = getExplorerSelectedCount({
     selectAllState,
@@ -49,9 +51,11 @@ const Header = memo(() => {
     <Flexbox horizontal align={'center'} gap={8} style={{ marginLeft: 0 }}>
       {libraryId ? (
         <ActionIcon
+          disabled={!canEditResources}
           icon={BookMinusIcon}
-          title={t('FileManager.actions.removeFromLibrary')}
+          title={canEditResources ? t('FileManager.actions.removeFromLibrary') : reason}
           onClick={() => {
+            if (!canEditResources) return;
             modal.confirm({
               okButtonProps: {
                 danger: true,
@@ -69,17 +73,21 @@ const Header = memo(() => {
       ) : null}
 
       <ActionIcon
+        disabled={!canEditResources}
         icon={FileBoxIcon}
-        title={t('FileManager.actions.batchChunking')}
+        title={canEditResources ? t('FileManager.actions.batchChunking') : reason}
         onClick={async () => {
+          if (!canEditResources) return;
           await onActionClick('batchChunking');
         }}
       />
 
       <ActionIcon
+        disabled={!canEditResources}
         icon={Trash2Icon}
-        title={t('delete', { ns: 'common' })}
+        title={canEditResources ? t('delete', { ns: 'common' }) : reason}
         onClick={() => {
+          if (!canEditResources) return;
           modal.confirm({
             okButtonProps: {
               danger: true,

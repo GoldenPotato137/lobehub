@@ -11,35 +11,46 @@ import { and, eq, inArray, lt, or, sql } from 'drizzle-orm';
 import type { AsyncTaskSelectItem, NewAsyncTaskItem } from '../schemas';
 import { asyncTasks } from '../schemas';
 import type { LobeChatDatabase } from '../type';
+import { buildWorkspacePayload, buildWorkspaceWhere } from '../utils/workspace';
 
 export class AsyncTaskModel {
   private userId: string;
   private db: LobeChatDatabase;
+  private workspaceId?: string;
 
-  constructor(db: LobeChatDatabase, userId: string) {
+  constructor(db: LobeChatDatabase, userId: string, workspaceId?: string) {
     this.userId = userId;
     this.db = db;
+    this.workspaceId = workspaceId;
   }
+
+  private ownership = () =>
+    buildWorkspaceWhere({ userId: this.userId, workspaceId: this.workspaceId }, asyncTasks);
 
   create = async (
     params: Pick<NewAsyncTaskItem, 'type' | 'status' | 'metadata' | 'parentId'>,
   ): Promise<string> => {
     const data = await this.db
       .insert(asyncTasks)
-      .values({ ...params, userId: this.userId })
+      .values(
+        buildWorkspacePayload(
+          { userId: this.userId, workspaceId: this.workspaceId },
+          { ...params },
+        ),
+      )
       .returning();
 
     return data[0].id;
   };
 
   delete = async (id: string) => {
-    return this.db
-      .delete(asyncTasks)
-      .where(and(eq(asyncTasks.id, id), eq(asyncTasks.userId, this.userId)));
+    return this.db.delete(asyncTasks).where(and(eq(asyncTasks.id, id), this.ownership()));
   };
 
   findById = async (id: string) => {
-    return this.db.query.asyncTasks.findFirst({ where: and(eq(asyncTasks.id, id)) });
+    return this.db.query.asyncTasks.findFirst({
+      where: and(eq(asyncTasks.id, id), this.ownership()),
+    });
   };
 
   static findByInferenceId = async (db: LobeChatDatabase, inferenceId: string) => {
@@ -58,7 +69,7 @@ export class AsyncTaskModel {
   findActiveByType = async (type: AsyncTaskType) => {
     return this.db.query.asyncTasks.findFirst({
       where: and(
-        eq(asyncTasks.userId, this.userId),
+        this.ownership(),
         eq(asyncTasks.type, type),
         inArray(asyncTasks.status, [AsyncTaskStatus.Pending, AsyncTaskStatus.Processing]),
       ),
@@ -98,7 +109,7 @@ export class AsyncTaskModel {
         `,
         updatedAt: new Date(),
       })
-      .where(and(eq(asyncTasks.id, taskId), eq(asyncTasks.userId, this.userId)))
+      .where(and(eq(asyncTasks.id, taskId), this.ownership()))
       .returning({ metadata: asyncTasks.metadata, status: asyncTasks.status });
 
     return result[0];

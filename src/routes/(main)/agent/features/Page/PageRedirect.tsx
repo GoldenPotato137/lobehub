@@ -1,14 +1,15 @@
 'use client';
 
 import { memo, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 
 import BrandTextLoading from '@/components/Loading/BrandTextLoading';
 import { useAutoCreateTopicDocument } from '@/features/TopicCanvas/useAutoCreateTopicDocument';
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
 
 const PageRedirect = memo(() => {
   const { aid, topicId } = useParams<{ aid?: string; topicId?: string }>();
-  const navigate = useNavigate();
+  const navigate = useWorkspaceAwareNavigate();
 
   const { documentId } = useAutoCreateTopicDocument(topicId, aid);
 

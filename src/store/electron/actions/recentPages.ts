@@ -2,10 +2,10 @@ import {
   getPinnedPages,
   savePinnedPages,
 } from '@/features/Electron/titlebar/RecentlyViewed/storage';
-import { guardedMergeCache } from '@/features/Electron/titlebar/TabBar/resolveRouteMeta';
-import { type TabItem } from '@/features/Electron/titlebar/TabBar/types';
-import { normalizeTabUrl } from '@/features/Electron/titlebar/TabBar/url';
-import { type DynamicRouteMeta } from '@/spa/router/routeMeta';
+import {
+  type CachedPageData,
+  type PageReference,
+} from '@/features/Electron/titlebar/RecentlyViewed/types';
 import { type StoreSetter } from '@/store/types';
 
 import { type ElectronStore } from '../store';
@@ -18,9 +18,11 @@ const PINNED_PAGES_LIMIT = 10;
 // ======== Types ======== //
 
 export interface RecentPagesState {
-  pinnedPages: TabItem[];
-  recentPages: TabItem[];
+  pinnedPages: PageReference[];
+  recentPages: PageReference[];
 }
+
+// ======== Action Interface ======== //
 
 // ======== Initial State ======== //
 
@@ -45,36 +47,44 @@ export class RecentPagesActionImpl {
     this.#get = get;
   }
 
-  addRecentPage = (url: string, cached?: DynamicRouteMeta): void => {
+  addRecentPage = (reference: PageReference, cached?: CachedPageData): void => {
     const { pinnedPages, recentPages } = this.#get();
-    const id = normalizeTabUrl(url);
+    const { id } = reference;
 
+    // If pinned, update cached data on pinned entry
     const pinnedIndex = pinnedPages.findIndex((p) => p.id === id);
     if (pinnedIndex >= 0) {
-      const merged = guardedMergeCache(pinnedPages[pinnedIndex].cached, cached);
-      if (merged === pinnedPages[pinnedIndex].cached) return;
-
-      const updatedPinned = [...pinnedPages];
-      updatedPinned[pinnedIndex] = { ...updatedPinned[pinnedIndex], cached: merged };
-      this.#set({ pinnedPages: updatedPinned }, false, 'updatePinnedPageCache');
-      savePinnedPages(updatedPinned);
+      if (cached) {
+        const updatedPinned = [...pinnedPages];
+        updatedPinned[pinnedIndex] = {
+          ...updatedPinned[pinnedIndex],
+          cached: { ...updatedPinned[pinnedIndex].cached, ...cached },
+        };
+        this.#set({ pinnedPages: updatedPinned }, false, 'updatePinnedPageCache');
+        savePinnedPages(updatedPinned);
+      }
       return;
     }
 
+    // Find existing entry
     const existingIndex = recentPages.findIndex((p) => p.id === id);
     const existingEntry = existingIndex >= 0 ? recentPages[existingIndex] : null;
 
-    const newEntry: TabItem = {
-      cached: guardedMergeCache(existingEntry?.cached, cached),
-      id,
+    // Merge cached data: new cached takes precedence, but preserve existing fields if not provided
+    const mergedCached = cached ? { ...existingEntry?.cached, ...cached } : existingEntry?.cached;
+
+    const newEntry: PageReference = {
+      ...reference,
+      cached: mergedCached,
       lastVisited: Date.now(),
-      url,
       visitCount: (existingEntry?.visitCount || 0) + 1,
     };
 
+    // Remove existing if present
     const filtered =
       existingIndex >= 0 ? recentPages.filter((_, i) => i !== existingIndex) : recentPages;
 
+    // Add to front, enforce limit
     const newRecent = [newEntry, ...filtered].slice(0, RECENT_PAGES_LIMIT);
 
     this.#set({ recentPages: newRecent }, false, 'addRecentPage');
@@ -93,26 +103,35 @@ export class RecentPagesActionImpl {
     const { recentPages } = this.#get();
 
     const pinnedIds = new Set(pinned.map((p) => p.id));
+
+    // Filter out any pages from recent that are now in pinned
+    // This handles the race condition where addRecentPage runs before loadPinnedPages
     const filteredRecent = recentPages.filter((p) => !pinnedIds.has(p.id));
 
     this.#set({ pinnedPages: pinned, recentPages: filteredRecent }, false, 'loadPinnedPages');
   };
 
-  pinPage = (page: TabItem): void => {
+  pinPage = (reference: PageReference): void => {
     const { pinnedPages, recentPages } = this.#get();
-    const { id } = page;
+    const { id } = reference;
 
+    // Check if already pinned
     if (pinnedPages.some((p) => p.id === id)) return;
+
+    // Check if pinned list is full
     if (pinnedPages.length >= PINNED_PAGES_LIMIT) return;
 
+    // Find existing entry in recent to preserve cached data
     const existingRecent = recentPages.find((p) => p.id === id);
 
-    const newEntry: TabItem = {
-      ...page,
-      cached: page.cached ?? existingRecent?.cached,
+    const newEntry: PageReference = {
+      ...reference,
+      // Preserve cached data from recent page if available
+      cached: reference.cached ?? existingRecent?.cached,
       lastVisited: Date.now(),
     };
 
+    // Add to pinned, remove from recent if exists
     const newPinned = [...pinnedPages, newEntry];
     const newRecent = recentPages.filter((p) => p.id !== id);
 
@@ -132,6 +151,8 @@ export class RecentPagesActionImpl {
     if (!page) return;
 
     const newPinned = pinnedPages.filter((p) => p.id !== id);
+
+    // Add back to recent (at the front)
     const newRecent = [page, ...recentPages].slice(0, RECENT_PAGES_LIMIT);
 
     this.#set({ pinnedPages: newPinned, recentPages: newRecent }, false, 'unpinPage');

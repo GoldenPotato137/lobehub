@@ -1,4 +1,5 @@
 import type {
+  AgentCLIPreset,
   AgentEventAdapter,
   HeterogeneousAgentEvent,
   HeterogeneousTerminalErrorData,
@@ -379,6 +380,12 @@ const getCodexTerminalErrorStderr = (raw: any): string | undefined => {
     rawMessage ||
     (raw?.error && typeof raw.error === 'object' ? JSON.stringify(raw.error) : undefined)
   );
+};
+
+export const codexPreset: AgentCLIPreset = {
+  baseArgs: ['exec', '--json', '--skip-git-repo-check', '--full-auto'],
+  promptMode: 'stdin',
+  resumeArgs: (sessionId) => ['exec', 'resume', '--json', '--skip-git-repo-check', sessionId],
 };
 
 export class CodexAdapter implements AgentEventAdapter {

@@ -4,10 +4,11 @@ import { ActionIcon, Flexbox } from '@lobehub/ui';
 import { cssVar } from 'antd-style';
 import { ArrowLeft } from 'lucide-react';
 import { memo } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import urlJoin from 'url-join';
 
 import NavHeader from '@/features/NavHeader';
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
 import StoreSearchBar from '@/routes/(main)/community/features/Search';
 import UserAvatar from '@/routes/(main)/community/features/UserAvatar';
 
@@ -15,7 +16,7 @@ import { styles } from './Header/style';
 
 const Header = memo(() => {
   const location = useLocation();
-  const navigate = useNavigate();
+  const navigate = useWorkspaceAwareNavigate();
 
   const handleGoBack = () => {
     // Extract the path segment (agent, model, provider, mcp, group_agent, user)

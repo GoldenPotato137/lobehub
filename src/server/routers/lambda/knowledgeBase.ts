@@ -1,26 +1,30 @@
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
+import { withScopedPermission } from '@/business/server/trpc-middlewares/rbacPermission';
+import { wsCompatProcedure } from '@/business/server/trpc-middlewares/workspaceAuth';
 import { serverDBEnv } from '@/config/db';
 import { KnowledgeBaseModel } from '@/database/models/knowledgeBase';
 import { insertKnowledgeBasesSchema } from '@/database/schemas';
-import { authedProcedure, router } from '@/libs/trpc/lambda';
+import { router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { FileService } from '@/server/services/file';
 import { type KnowledgeBaseItem } from '@/types/knowledgeBase';
 
-const knowledgeBaseProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
+const knowledgeBaseProcedure = wsCompatProcedure.use(serverDatabase).use(async (opts) => {
   const { ctx } = opts;
+  const wsId = ctx.workspaceId ?? undefined;
 
   return opts.next({
     ctx: {
-      knowledgeBaseModel: new KnowledgeBaseModel(ctx.serverDB, ctx.userId),
+      knowledgeBaseModel: new KnowledgeBaseModel(ctx.serverDB, ctx.userId, wsId),
     },
   });
 });
 
 export const knowledgeBaseRouter = router({
   addFilesToKnowledgeBase: knowledgeBaseProcedure
+    .use(withScopedPermission('knowledge_base:update'))
     .input(z.object({ ids: z.array(z.string()), knowledgeBaseId: z.string() }))
     .mutation(async ({ input, ctx }) => {
       try {
@@ -42,6 +46,7 @@ export const knowledgeBaseRouter = router({
     }),
 
   createKnowledgeBase: knowledgeBaseProcedure
+    .use(withScopedPermission('knowledge_base:create'))
     .input(
       z.object({
         avatar: z.string().optional(),
@@ -69,25 +74,31 @@ export const knowledgeBaseRouter = router({
     return ctx.knowledgeBaseModel.query();
   }),
 
-  removeAllKnowledgeBases: knowledgeBaseProcedure.mutation(async ({ ctx }) => {
-    const result = await ctx.knowledgeBaseModel.deleteAllWithFiles(serverDBEnv.REMOVE_GLOBAL_FILE);
+  removeAllKnowledgeBases: knowledgeBaseProcedure
+    .use(withScopedPermission('knowledge_base:delete'))
+    .mutation(async ({ ctx }) => {
+      const result = await ctx.knowledgeBaseModel.deleteAllWithFiles(
+        serverDBEnv.REMOVE_GLOBAL_FILE,
+      );
 
-    if (result.deletedFiles.length > 0) {
-      const fileService = new FileService(ctx.serverDB, ctx.userId);
-      const urls = result.deletedFiles.map((f) => f.url).filter(Boolean) as string[];
-      if (urls.length > 0) {
-        await fileService.deleteFiles(urls);
+      if (result.deletedFiles.length > 0) {
+        const fileService = new FileService(ctx.serverDB, ctx.userId);
+        const urls = result.deletedFiles.map((f) => f.url).filter(Boolean) as string[];
+        if (urls.length > 0) {
+          await fileService.deleteFiles(urls);
+        }
       }
-    }
-  }),
+    }),
 
   removeFilesFromKnowledgeBase: knowledgeBaseProcedure
+    .use(withScopedPermission('knowledge_base:update'))
     .input(z.object({ ids: z.array(z.string()), knowledgeBaseId: z.string() }))
     .mutation(async ({ input, ctx }) => {
       return ctx.knowledgeBaseModel.removeFilesFromKnowledgeBase(input.knowledgeBaseId, input.ids);
     }),
 
   removeKnowledgeBase: knowledgeBaseProcedure
+    .use(withScopedPermission('knowledge_base:delete'))
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
       const result = await ctx.knowledgeBaseModel.deleteWithFiles(
@@ -105,6 +116,7 @@ export const knowledgeBaseRouter = router({
     }),
 
   updateKnowledgeBase: knowledgeBaseProcedure
+    .use(withScopedPermission('knowledge_base:update'))
     .input(
       z.object({
         id: z.string(),

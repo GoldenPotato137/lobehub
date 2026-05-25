@@ -331,64 +331,24 @@ const WorkflowCollapse = memo<WorkflowCollapseProps>(
       threshold: WORKFLOW_EXPANDED_SCROLL_THRESHOLD_PX,
     });
 
-    const renderStatusBlock = (): React.ReactNode => {
-      const wrapInBlock = (inner: React.ReactNode) => (
-        <Block
-          horizontal
-          align="center"
-          flex="none"
-          height={24}
-          justify="center"
-          style={{ fontSize: 12 }}
-          variant="outlined"
-          width={24}
-        >
-          {inner}
-        </Block>
-      );
-
+    const getStatusIcon = (): React.ReactNode => {
       if (streaming) {
-        return wrapInBlock(
-          pendingInterventionPresent ? (
-            <Icon color={cssVar.colorInfo} icon={HandIcon} />
-          ) : (
-            <NeuralNetworkLoading size={16} />
-          ),
+        return pendingInterventionPresent ? (
+          <Icon color={cssVar.colorInfo} icon={HandIcon} />
+        ) : (
+          <NeuralNetworkLoading size={16} />
         );
       }
 
       switch (completionStatus) {
         case 'error': {
-          return wrapInBlock(<Icon color={cssVar.colorError} icon={X} />);
+          return <Icon color={cssVar.colorError} icon={X} />;
         }
         case 'partial': {
-          // Mix of success + failure: show success as the primary state and
-          // surface a small warning badge at the bottom-right so the overall
-          // turn still reads as "done" rather than "broken".
-          return (
-            <div style={{ flex: 'none', position: 'relative' }}>
-              {wrapInBlock(<Icon color={cssVar.colorSuccess} icon={Check} />)}
-              <div
-                style={{
-                  alignItems: 'center',
-                  background: cssVar.colorBgContainer,
-                  borderRadius: '50%',
-                  bottom: 0,
-                  display: 'flex',
-                  height: 10,
-                  justifyContent: 'center',
-                  position: 'absolute',
-                  right: 0,
-                  width: 10,
-                }}
-              >
-                <Icon color={cssVar.colorWarning} icon={AlertTriangle} size={8} />
-              </div>
-            </div>
-          );
+          return <Icon color={cssVar.colorWarning} icon={AlertTriangle} />;
         }
         default: {
-          return wrapInBlock(<Icon color={cssVar.colorSuccess} icon={Check} />);
+          return <Icon color={cssVar.colorSuccess} icon={Check} />;
         }
       }
     };
@@ -431,7 +391,18 @@ const WorkflowCollapse = memo<WorkflowCollapseProps>(
 
     const title = (
       <Flexbox horizontal align="center" gap={6} style={{ minWidth: 0 }}>
-        {renderStatusBlock()}
+        <Block
+          horizontal
+          align="center"
+          flex="none"
+          height={24}
+          justify="center"
+          style={{ fontSize: 12 }}
+          variant="outlined"
+          width={24}
+        >
+          {getStatusIcon()}
+        </Block>
         {streaming ? (
           <Flexbox
             horizontal
@@ -444,7 +415,7 @@ const WorkflowCollapse = memo<WorkflowCollapseProps>(
             }}
           >
             <div style={{ minWidth: 0, overflow: 'hidden' }}>
-              <AnimatePresence initial={false} mode="popLayout">
+              <AnimatePresence initial={false} mode="wait">
                 <motion.div
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}

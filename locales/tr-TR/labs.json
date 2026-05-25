@@ -7,6 +7,8 @@
   "features.gatewayMode.title": "Sunucu Taraflı Aracı Yürütme (Gateway)",
   "features.groupChat.desc": "Çoklu temsilci grup sohbeti koordinasyonunu etkinleştirin.",
   "features.groupChat.title": "Grup Sohbeti (Çoklu Temsilci)",
+  "features.heterogeneousAgent.desc": "Claude Code, Codex CLI ve diğer harici ajan CLI’ları ile heterojen ajan yürütmesini etkinleştirin. Kenar çubuğu ajan menüsünde bir \"Claude Code Ajanı\" seçeneği oluşturur.",
+  "features.heterogeneousAgent.title": "Heterojen Ajan (Claude Code)",
   "features.inputMarkdown.desc": "Girdi alanında Markdown biçimlendirmesini (kalın metin, kod blokları, tablolar vb.) gerçek zamanlı olarak görüntüleyin.",
   "features.inputMarkdown.title": "Girdi Markdown Görüntüleme",
   "features.messenger.desc": "Telegram (ve diğer mesajlaşma uygulamaları) üzerinden LobeHub botu aracılığıyla ajanlarınızla konuşun. Hesabınızı bağlamak ve hangi ajanın mesajları alacağını seçmek için Ayarlar'da bir Mesajlaşma sekmesi ekler.",

@@ -44,10 +44,12 @@ export class MessengerAccountLinkRelinkRequiredError extends Error {
 export class MessengerAccountLinkModel {
   private userId: string;
   private db: LobeChatDatabase;
+  private workspaceId?: string;
 
-  constructor(db: LobeChatDatabase, userId: string) {
+  constructor(db: LobeChatDatabase, userId: string, workspaceId?: string) {
     this.userId = userId;
     this.db = db;
+    this.workspaceId = workspaceId;
   }
 
   // --------------- User-scoped CRUD ---------------
@@ -87,6 +89,7 @@ export class MessengerAccountLinkModel {
           tenantId,
           updatedAt: now,
           userId: this.userId,
+          workspaceId: this.workspaceId ?? null,
         })
         .onConflictDoNothing({
           target: [

@@ -44,7 +44,7 @@ const ChatItem = memo<ChatItemProps>(
     ...rest
   }) => {
     const isUser = placement === 'right';
-    const conversationKey = useConversationStore(contextSelectors.conversationKey);
+    const topicId = useConversationStore(contextSelectors.topicId);
     const isEmptyMessage =
       !message || String(message).trim() === '' || message === placeholderMessage;
     const errorContent = error && (
@@ -118,9 +118,7 @@ const ChatItem = memo<ChatItemProps>(
           )}
           {belowMessage}
         </Flexbox>
-        {id && conversationKey && (
-          <FollowUpChips conversationKey={conversationKey} messageId={id} />
-        )}
+        {id && topicId && <FollowUpChips messageId={id} topicId={topicId} />}
         {actions && <Actions actions={actions} placement={placement} />}
       </Flexbox>
     );

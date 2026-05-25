@@ -45,7 +45,6 @@ import type {
   MemoryExtractionAgentCallTrace,
   MemoryExtractionTraceError,
   MemoryExtractionTracePayload,
-  UserServiceModelConfig,
 } from '@lobechat/types';
 import { RequestTrigger } from '@lobechat/types';
 import { type FlowControl } from '@upstash/qstash';
@@ -584,38 +583,6 @@ type RuntimeBundle = {
   layerExtractor: ModelRuntime;
 };
 
-interface MemoryExtractionModelConfig {
-  embeddingsModel: string;
-  gateModel: string;
-  layerModels: Partial<Record<LayersEnum, string>>;
-  observabilityS3: MemoryExtractionConfig['observabilityS3'];
-}
-
-interface ResolvedMemoryServiceConfig {
-  agents: {
-    embedding: MemoryAgentConfig;
-    gatekeeper: MemoryAgentConfig;
-    layerExtractor: MemoryAgentConfig;
-  };
-  embeddingContextLimit?: number;
-  extractorContextLimit?: number;
-  modelConfig: MemoryExtractionModelConfig;
-  overrides: {
-    embedding: {
-      model: boolean;
-      provider: boolean;
-    };
-    gatekeeper: {
-      model: boolean;
-      provider: boolean;
-    };
-    layerExtractor: {
-      model: boolean;
-      provider: boolean;
-    };
-  };
-}
-
 export interface TopicExtractionJob {
   asyncTaskId?: string;
   forceAll: boolean;
@@ -656,7 +623,14 @@ export class MemoryExtractionExecutor {
   private readonly layerPreferredModels?: string[];
   private readonly layerPreferredProviders?: string[];
   private readonly privateConfig: MemoryExtractionConfig;
-  private readonly modelConfig: MemoryExtractionModelConfig;
+  private readonly modelConfig: {
+    embeddingsModel: string;
+    gateModel: string;
+    layerModels: Partial<Record<LayersEnum, string>>;
+    observabilityS3: MemoryExtractionConfig['observabilityS3'];
+  };
+  private readonly embeddingContextLimit?: number;
+
   private readonly runtimeCache = new Map<string, RuntimeBundle>();
   private readonly db = getServerDB();
 
@@ -685,6 +659,9 @@ export class MemoryExtractionExecutor {
       ),
       observabilityS3: privateConfig.observabilityS3,
     };
+
+    this.embeddingContextLimit =
+      privateConfig.embedding?.contextLimit ?? privateConfig.agentLayerExtractor.contextLimit;
   }
 
   static async create() {
@@ -694,95 +671,6 @@ export class MemoryExtractionExecutor {
     ]);
 
     return new MemoryExtractionExecutor(serverConfig, privateConfig);
-  }
-
-  private resolveUserMemoryAgent(
-    systemAgent: Partial<UserServiceModelConfig> | undefined,
-    key: keyof Pick<
-      UserServiceModelConfig,
-      'userMemoryEmbedding' | 'memoryAnalysisAgentConfig' | 'userMemoryPersonaWriter'
-    >,
-    fallback: MemoryAgentConfig,
-  ): MemoryAgentConfig {
-    const override = systemAgent?.[key];
-    const provider = override?.provider || fallback.provider;
-    const shouldInheritCredentials =
-      !override?.provider ||
-      normalizeProvider(override.provider) === normalizeProvider(fallback.provider || 'openai');
-    const contextLimit =
-      typeof override?.contextLimit === 'number' &&
-      Number.isFinite(override.contextLimit) &&
-      override.contextLimit > 0
-        ? Math.floor(override.contextLimit)
-        : fallback.contextLimit;
-
-    return {
-      apiKey: shouldInheritCredentials ? fallback.apiKey : undefined,
-      baseURL: shouldInheritCredentials ? fallback.baseURL : undefined,
-      contextLimit,
-      language: fallback.language,
-      model: override?.model || fallback.model,
-      provider,
-    };
-  }
-
-  private resolveUserMemoryServiceConfig(
-    systemAgent?: Partial<UserServiceModelConfig>,
-  ): ResolvedMemoryServiceConfig {
-    const gatekeeper = this.resolveUserMemoryAgent(
-      systemAgent,
-      'memoryAnalysisAgentConfig',
-      this.privateConfig.agentGateKeeper,
-    );
-    const layerExtractor = this.resolveUserMemoryAgent(
-      systemAgent,
-      'memoryAnalysisAgentConfig',
-      this.privateConfig.agentLayerExtractor,
-    );
-    const embedding = this.resolveUserMemoryAgent(
-      systemAgent,
-      'userMemoryEmbedding',
-      this.privateConfig.embedding,
-    );
-    const layerModels = systemAgent?.memoryAnalysisAgentConfig?.model
-      ? {
-          activity: layerExtractor.model,
-          context: layerExtractor.model,
-          experience: layerExtractor.model,
-          identity: layerExtractor.model,
-          preference: layerExtractor.model,
-        }
-      : resolveLayerModels(undefined, this.privateConfig.agentLayerExtractor.layers);
-
-    return {
-      agents: {
-        embedding,
-        gatekeeper,
-        layerExtractor,
-      },
-      embeddingContextLimit: embedding.contextLimit ?? layerExtractor.contextLimit,
-      extractorContextLimit: layerExtractor.contextLimit,
-      modelConfig: {
-        embeddingsModel: embedding.model,
-        gateModel: gatekeeper.model,
-        layerModels,
-        observabilityS3: this.privateConfig.observabilityS3,
-      },
-      overrides: {
-        embedding: {
-          model: Boolean(systemAgent?.userMemoryEmbedding?.model),
-          provider: Boolean(systemAgent?.userMemoryEmbedding?.provider),
-        },
-        gatekeeper: {
-          model: Boolean(systemAgent?.memoryAnalysisAgentConfig?.model),
-          provider: Boolean(systemAgent?.memoryAnalysisAgentConfig?.provider),
-        },
-        layerExtractor: {
-          model: Boolean(systemAgent?.memoryAnalysisAgentConfig?.model),
-          provider: Boolean(systemAgent?.memoryAnalysisAgentConfig?.provider),
-        },
-      },
-    };
   }
 
   private buildBaseMetadata(
@@ -1543,16 +1431,10 @@ export class MemoryExtractionExecutor {
             userModel.getUserState(KeyVaultsGateKeeper.getUserKeyVaults),
             this.getAiProviderRuntimeState(job.userId),
           ]);
-          const memoryServiceConfig = this.resolveUserMemoryServiceConfig(
-            userState.settings?.systemAgent as Partial<UserServiceModelConfig> | undefined,
-          );
-          const keyVaults = await this.resolveRuntimeKeyVaults(
-            aiProviderRuntimeState,
-            memoryServiceConfig,
-          );
+          const keyVaults = await this.resolveRuntimeKeyVaults(aiProviderRuntimeState);
           const language = userState.settings?.general?.responseLanguage;
 
-          const runtimes = await this.getRuntime(job.userId, memoryServiceConfig, keyVaults);
+          const runtimes = await this.getRuntime(job.userId, keyVaults);
 
           const conversations = await this.listConversationsForTopic(
             job.userId,
@@ -1572,9 +1454,8 @@ export class MemoryExtractionExecutor {
             };
           }
 
-          const extractorContextLimit = memoryServiceConfig.extractorContextLimit;
-          const embeddingContextLimit =
-            memoryServiceConfig.embeddingContextLimit ?? extractorContextLimit;
+          const extractorContextLimit = this.privateConfig.agentLayerExtractor.contextLimit;
+          const embeddingContextLimit = this.embeddingContextLimit ?? extractorContextLimit;
           const extractorConversations = await this.trimConversationsToTokenLimit(
             conversations,
             extractorContextLimit,
@@ -1627,7 +1508,7 @@ export class MemoryExtractionExecutor {
             searchResult = await this.listRelevantUserMemories(
               extractionJob,
               runtimes.embeddings,
-              memoryServiceConfig.modelConfig.embeddingsModel,
+              this.modelConfig.embeddingsModel,
               job.userId,
               embeddingConversations,
               embeddingContextLimit,
@@ -1740,7 +1621,7 @@ export class MemoryExtractionExecutor {
           };
 
           const service = new MemoryExtractionService({
-            config: memoryServiceConfig.modelConfig,
+            config: this.modelConfig,
             db,
             language,
             runtimes,
@@ -1795,7 +1676,6 @@ export class MemoryExtractionExecutor {
             messageIds,
             extraction,
             runtimes,
-            memoryServiceConfig,
             db,
           );
           if (retrievalErrors.length > 0) {
@@ -2143,7 +2023,6 @@ export class MemoryExtractionExecutor {
     messageIds: string[],
     extraction: MemoryExtractionResult,
     runtimes: RuntimeBundle,
-    memoryServiceConfig: ResolvedMemoryServiceConfig,
     db: Awaited<ReturnType<typeof getServerDB>>,
   ): Promise<PersistedMemoryResult> {
     const createdIds: string[] = [];
@@ -2229,8 +2108,8 @@ export class MemoryExtractionExecutor {
           messageIds,
           activityOutput.data,
           runtimes.embeddings,
-          memoryServiceConfig.modelConfig.embeddingsModel,
-          memoryServiceConfig.embeddingContextLimit,
+          this.modelConfig.embeddingsModel,
+          this.embeddingContextLimit,
           db,
         ),
       );
@@ -2247,8 +2126,8 @@ export class MemoryExtractionExecutor {
           messageIds,
           contextOutput.data,
           runtimes.embeddings,
-          memoryServiceConfig.modelConfig.embeddingsModel,
-          memoryServiceConfig.embeddingContextLimit,
+          this.modelConfig.embeddingsModel,
+          this.embeddingContextLimit,
           db,
         ),
       );
@@ -2265,8 +2144,8 @@ export class MemoryExtractionExecutor {
           messageIds,
           experienceOutput.data,
           runtimes.embeddings,
-          memoryServiceConfig.modelConfig.embeddingsModel,
-          memoryServiceConfig.embeddingContextLimit,
+          this.modelConfig.embeddingsModel,
+          this.embeddingContextLimit,
           db,
         ),
       );
@@ -2283,8 +2162,8 @@ export class MemoryExtractionExecutor {
           messageIds,
           preferenceOutput.data,
           runtimes.embeddings,
-          memoryServiceConfig.modelConfig.embeddingsModel,
-          memoryServiceConfig.embeddingContextLimit,
+          this.modelConfig.embeddingsModel,
+          this.embeddingContextLimit,
           db,
         ),
       );
@@ -2301,8 +2180,8 @@ export class MemoryExtractionExecutor {
           messageIds,
           identityOutput.data,
           runtimes.embeddings,
-          memoryServiceConfig.modelConfig.embeddingsModel,
-          memoryServiceConfig.embeddingContextLimit,
+          this.modelConfig.embeddingsModel,
+          this.embeddingContextLimit,
           db,
         ),
       );
@@ -2331,7 +2210,6 @@ export class MemoryExtractionExecutor {
 
   private async resolveRuntimeKeyVaults(
     runtimeState: AiProviderRuntimeState,
-    memoryServiceConfig: ResolvedMemoryServiceConfig,
   ): Promise<ProviderKeyVaultMap> {
     const normalizedRuntimeConfig = Object.fromEntries(
       Object.entries(runtimeState.runtimeConfig || {}).map(([providerId, config]) => [
@@ -2343,15 +2221,11 @@ export class MemoryExtractionExecutor {
     const keyVaults: ProviderKeyVaultMap = {};
 
     const gatekeeperProvider = await AiInfraRepos.tryMatchingProviderFrom(runtimeState, {
-      fallbackProvider: memoryServiceConfig.agents.gatekeeper.provider,
+      fallbackProvider: this.privateConfig.agentGateKeeper.provider,
       label: 'gatekeeper',
-      modelId: memoryServiceConfig.modelConfig.gateModel,
-      preferredModels: memoryServiceConfig.overrides.gatekeeper.model
-        ? undefined
-        : this.gatekeeperPreferredModels,
-      preferredProviders: memoryServiceConfig.overrides.gatekeeper.provider
-        ? undefined
-        : this.gatekeeperPreferredProviders,
+      modelId: this.modelConfig.gateModel,
+      preferredModels: this.gatekeeperPreferredModels,
+      preferredProviders: this.gatekeeperPreferredProviders,
     });
     const gatekeeperRuntime = normalizedRuntimeConfig[gatekeeperProvider];
     if (gatekeeperRuntime?.keyVaults) {
@@ -2359,33 +2233,25 @@ export class MemoryExtractionExecutor {
     }
 
     const embeddingProvider = await AiInfraRepos.tryMatchingProviderFrom(runtimeState, {
-      fallbackProvider: memoryServiceConfig.agents.embedding.provider,
+      fallbackProvider: this.privateConfig.embedding.provider,
       label: 'embedding',
-      modelId: memoryServiceConfig.modelConfig.embeddingsModel,
-      preferredModels: memoryServiceConfig.overrides.embedding.model
-        ? undefined
-        : this.embeddingPreferredModels,
-      preferredProviders: memoryServiceConfig.overrides.embedding.provider
-        ? undefined
-        : this.embeddingPreferredProviders,
+      modelId: this.modelConfig.embeddingsModel,
+      preferredModels: this.embeddingPreferredModels,
+      preferredProviders: this.embeddingPreferredProviders,
     });
     const embeddingRuntime = normalizedRuntimeConfig[embeddingProvider];
     if (embeddingRuntime?.keyVaults) {
       keyVaults[embeddingProvider] = embeddingRuntime.keyVaults;
     }
 
-    for (const model of Object.values(memoryServiceConfig.modelConfig.layerModels)) {
+    for (const model of Object.values(this.modelConfig.layerModels)) {
       if (!model) continue;
       const providerId = await AiInfraRepos.tryMatchingProviderFrom(runtimeState, {
-        fallbackProvider: memoryServiceConfig.agents.layerExtractor.provider,
+        fallbackProvider: this.privateConfig.agentLayerExtractor.provider,
         label: 'layer extractor',
         modelId: model,
-        preferredModels: memoryServiceConfig.overrides.layerExtractor.model
-          ? undefined
-          : this.layerPreferredModels,
-        preferredProviders: memoryServiceConfig.overrides.layerExtractor.provider
-          ? undefined
-          : this.layerPreferredProviders,
+        preferredModels: this.layerPreferredModels,
+        preferredProviders: this.layerPreferredProviders,
       });
       const runtime = normalizedRuntimeConfig[providerId];
       if (runtime?.keyVaults) {
@@ -2398,7 +2264,6 @@ export class MemoryExtractionExecutor {
 
   private async getRuntime(
     userId: string,
-    memoryServiceConfig: ResolvedMemoryServiceConfig,
     keyVaults?: ProviderKeyVaultMap,
   ): Promise<RuntimeBundle> {
     // TODO: implement a better cache eviction strategy
@@ -2407,51 +2272,33 @@ export class MemoryExtractionExecutor {
       this.runtimeCache.clear();
     }
 
-    const cacheKey = [
-      userId,
-      memoryServiceConfig.agents.embedding.provider,
-      memoryServiceConfig.agents.gatekeeper.provider,
-      memoryServiceConfig.agents.layerExtractor.provider,
-    ].join(':');
-    const cached = this.runtimeCache.get(cacheKey);
+    const cached = this.runtimeCache.get(userId);
     if (cached) return cached;
 
     const embeddingOptions: RuntimeResolveOptions = {
       fallback: {
-        apiKey: memoryServiceConfig.agents.embedding.apiKey,
-        baseURL: memoryServiceConfig.agents.embedding.baseURL,
+        apiKey: this.privateConfig.embedding.apiKey,
+        baseURL: this.privateConfig.embedding.baseURL,
       },
-      preferred: {
-        providerIds: memoryServiceConfig.overrides.embedding.provider
-          ? undefined
-          : this.embeddingPreferredProviders,
-      },
+      preferred: { providerIds: this.embeddingPreferredProviders },
       userId,
     };
 
     const gatekeeperOptions: RuntimeResolveOptions = {
       fallback: {
-        apiKey: memoryServiceConfig.agents.gatekeeper.apiKey,
-        baseURL: memoryServiceConfig.agents.gatekeeper.baseURL,
+        apiKey: this.privateConfig.agentGateKeeper.apiKey,
+        baseURL: this.privateConfig.agentGateKeeper.baseURL,
       },
-      preferred: {
-        providerIds: memoryServiceConfig.overrides.gatekeeper.provider
-          ? undefined
-          : this.gatekeeperPreferredProviders,
-      },
+      preferred: { providerIds: this.gatekeeperPreferredProviders },
       userId,
     };
 
     const layerExtractorOptions: RuntimeResolveOptions = {
       fallback: {
-        apiKey: memoryServiceConfig.agents.layerExtractor.apiKey,
-        baseURL: memoryServiceConfig.agents.layerExtractor.baseURL,
+        apiKey: this.privateConfig.agentLayerExtractor.apiKey,
+        baseURL: this.privateConfig.agentLayerExtractor.baseURL,
       },
-      preferred: {
-        providerIds: memoryServiceConfig.overrides.layerExtractor.provider
-          ? undefined
-          : this.layerPreferredProviders,
-      },
+      preferred: { providerIds: this.layerPreferredProviders },
       userId,
     };
 
@@ -2459,26 +2306,26 @@ export class MemoryExtractionExecutor {
 
     const runtimes: RuntimeBundle = {
       embeddings: await resolveRuntimeAgentConfig(
-        memoryServiceConfig.agents.embedding,
+        { ...this.privateConfig.embedding },
         keyVaults,
         embeddingOptions,
         hooks,
       ),
       gatekeeper: await resolveRuntimeAgentConfig(
-        memoryServiceConfig.agents.gatekeeper,
+        { ...this.privateConfig.agentGateKeeper },
         keyVaults,
         gatekeeperOptions,
         hooks,
       ),
       layerExtractor: await resolveRuntimeAgentConfig(
-        memoryServiceConfig.agents.layerExtractor,
+        { ...this.privateConfig.agentLayerExtractor },
         keyVaults,
         layerExtractorOptions,
         hooks,
       ),
     };
 
-    this.runtimeCache.set(cacheKey, runtimes);
+    this.runtimeCache.set(userId, runtimes);
 
     return runtimes;
   }
@@ -2514,16 +2361,10 @@ export class MemoryExtractionExecutor {
             userModel.getUserState(KeyVaultsGateKeeper.getUserKeyVaults),
             this.getAiProviderRuntimeState(params.userId),
           ]);
-          const memoryServiceConfig = this.resolveUserMemoryServiceConfig(
-            userState.settings?.systemAgent as Partial<UserServiceModelConfig> | undefined,
-          );
-          const keyVaults = await this.resolveRuntimeKeyVaults(
-            aiProviderRuntimeState,
-            memoryServiceConfig,
-          );
+          const keyVaults = await this.resolveRuntimeKeyVaults(aiProviderRuntimeState);
           const language = params.language || userState.settings?.general?.responseLanguage;
 
-          const runtimes = await this.getRuntime(params.userId, memoryServiceConfig, keyVaults);
+          const runtimes = await this.getRuntime(params.userId, keyVaults);
           const contextProvider =
             params.contextProvider ||
             new BenchmarkLocomoContextProvider({
@@ -2552,7 +2393,7 @@ export class MemoryExtractionExecutor {
           };
 
           const builtContext = await contextProvider.buildContext(extractionJob.userId);
-          const extractorContextLimit = memoryServiceConfig.extractorContextLimit;
+          const extractorContextLimit = this.privateConfig.agentLayerExtractor.contextLimit;
           const trimmedContext = await this.trimTextToTokenLimit(
             builtContext.context,
             extractorContextLimit,
@@ -2590,7 +2431,7 @@ export class MemoryExtractionExecutor {
           };
 
           const service = new MemoryExtractionService({
-            config: memoryServiceConfig.modelConfig,
+            config: this.modelConfig,
             db,
             language,
             runtimes,
@@ -2635,7 +2476,6 @@ export class MemoryExtractionExecutor {
             [],
             extraction,
             runtimes,
-            memoryServiceConfig,
             db,
           );
 

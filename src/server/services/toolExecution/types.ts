@@ -32,18 +32,10 @@ export interface ToolExecutionContext {
   messageId?: string;
   /** Agent runtime operation ID for structured tool outcome identity. */
   operationId?: string;
-  /**
-   * Project-level skills (name + absolute SKILL.md path) discovered on the
-   * device filesystem. Used by the Skills runtime to load them on demand via
-   * the device gateway. Derived from the operation's skill set.
-   */
-  projectSkills?: { location: string; name: string }[];
   /** Conversation scope captured when the operation was created */
   scope?: string | null;
   /** Server database for LobeHub Skills execution */
   serverDB?: LobeChatDatabase;
-  /** Skip low-level result truncation so the AgentRuntime boundary can archive full content first. */
-  skipResultTruncation?: boolean;
   /** Task ID when executing within the Task system */
   taskId?: string;
   /** Current thread ID for thread-scoped conversations */
@@ -59,6 +51,14 @@ export interface ToolExecutionContext {
   /** Topic ID for sandbox session management */
   topicId?: string;
   userId?: string;
+  /**
+   * Workspace ID that scopes ownership for any model/service the runtime
+   * instantiates. When unset the runtime falls back to personal mode
+   * (`workspace_id IS NULL`). Threaded from the chat/task router through
+   * `state.metadata.workspaceId` so tool side-effects (createBrief, pinTask,
+   * etc.) land in the same workspace the request originated from.
+   */
+  workspaceId?: string;
 }
 
 export interface ToolExecutionResult {

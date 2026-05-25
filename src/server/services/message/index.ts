@@ -2,11 +2,9 @@ import { type LobeChatDatabase } from '@lobechat/database';
 import { CompressionRepository } from '@lobechat/database';
 import {
   type CreateMessageParams,
-  type QueryMessageParams,
   type UIChatMessage,
   type UpdateMessageParams,
 } from '@lobechat/types';
-import { createTimingHelpers, getDurationMs } from '@lobechat/utils';
 
 import { MessageModel } from '@/database/models/message';
 
@@ -17,25 +15,8 @@ interface QueryOptions {
   groupId?: string | null;
   sessionId?: string | null;
   threadId?: string | null;
-  timingRequestId?: string;
-  timingStartedAt?: number;
   topicId?: string | null;
 }
-
-const { createPrefixedTimingContext, logTiming, toTimingContext } = createTimingHelpers(
-  'lobe-server:chat:lobehub:timing',
-);
-
-const logMessageTiming = (
-  options: QueryOptions | undefined,
-  event: string,
-  metadata?: Record<string, unknown>,
-) => {
-  logTiming(toTimingContext(options), event, metadata);
-};
-
-const createModelTiming = (options: QueryOptions | undefined, prefix: string) =>
-  createPrefixedTimingContext(toTimingContext(options), prefix);
 
 interface CreateMessageResult {
   id: string;
@@ -53,10 +34,10 @@ export class MessageService {
   private fileService: FileService;
   private compressionRepository: CompressionRepository;
 
-  constructor(db: LobeChatDatabase, userId: string) {
-    this.messageModel = new MessageModel(db, userId);
+  constructor(db: LobeChatDatabase, userId: string, workspaceId?: string) {
+    this.messageModel = new MessageModel(db, userId, workspaceId);
     this.fileService = new FileService(db, userId);
-    this.compressionRepository = new CompressionRepository(db, userId);
+    this.compressionRepository = new CompressionRepository(db, userId, workspaceId);
   }
 
   /**
@@ -89,39 +70,17 @@ export class MessageService {
         options.sessionId === undefined &&
         options.topicId === undefined)
     ) {
-      logMessageTiming(options, 'lambda.message.update.queryMessages:skipped');
       return { success: true };
     }
 
     const { agentId, sessionId, topicId, groupId, threadId } = options;
 
-    const queryStartedAt = Date.now();
-    const modelTiming = createModelTiming(options, 'lambda.message.update.queryMessages');
     const messages = await this.messageModel.query(
       { agentId, groupId, sessionId, threadId, topicId },
-      {
-        ...this.getQueryOptions(),
-        ...(modelTiming ? { timing: modelTiming } : {}),
-      },
+      this.getQueryOptions(),
     );
-    logMessageTiming(options, 'lambda.message.update.queryMessages:done', {
-      messageCount: messages.length,
-      stageMs: getDurationMs(queryStartedAt),
-    });
 
     return { messages, success: true };
-  }
-
-  /**
-   * Fetch the canonical message list for an agent / topic scope, using the
-   * standard UIChatMessage shape (file URLs resolved through FileService).
-   *
-   * Mirrors the read path exposed by the `message.getMessages` trpc lambda
-   * so server-internal callers (e.g. agent runtime stream events) can push
-   * the same payload the client would otherwise fetch.
-   */
-  async queryMessages(params: QueryMessageParams): Promise<UIChatMessage[]> {
-    return this.messageModel.query(params, this.getQueryOptions());
   }
 
   /**
@@ -229,18 +188,7 @@ export class MessageService {
     value: UpdateMessageParams,
     options: QueryOptions,
   ): Promise<{ messages?: UIChatMessage[]; success: boolean }> {
-    const updateStartedAt = Date.now();
-    const modelTiming = createModelTiming(options, 'lambda.message.update.dbUpdate');
-    if (modelTiming) {
-      await this.messageModel.update(id, value as any, modelTiming);
-    } else {
-      await this.messageModel.update(id, value as any);
-    }
-    logMessageTiming(options, 'lambda.message.update.dbUpdate:done', {
-      stageMs: getDurationMs(updateStartedAt),
-      valueKeys: Object.keys(value ?? {}),
-    });
-
+    await this.messageModel.update(id, value as any);
     return this.queryWithSuccess(options);
   }
 

@@ -548,9 +548,6 @@ describe('LobeAnthropicAI', () => {
         vi.spyOn(customInstance['client'].messages, 'create').mockRejectedValue(apiError);
 
         // Act & Assert
-        // anthropicCompatibleFactory normalizes the `/v1` suffix away (see #14960),
-        // then desensitizeUrl reconstructs via the WHATWG URL parser which always
-        // emits a trailing `/` in the pathname.
         await expect(
           customInstance.chat({
             messages: [{ content: 'Hello', role: 'user' }],
@@ -558,7 +555,7 @@ describe('LobeAnthropicAI', () => {
             temperature: 0,
           }),
         ).rejects.toEqual({
-          endpoint: 'https://api.cu****om.com/',
+          endpoint: 'https://api.cu****om.com/v1',
           error: apiError,
           errorType: invalidErrorType,
           provider,

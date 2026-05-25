@@ -42,9 +42,6 @@ declare global {
   /** Vite define: running under Vitest */
   const __TEST__: boolean;
 
-  /** Vite define: enable react-scan diagnostic runtime */
-  const __REACT_SCAN__: boolean;
-
   /** Vite define: current bundle is mobile variant */
   const __MOBILE__: boolean;
 

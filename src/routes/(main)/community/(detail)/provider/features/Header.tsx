@@ -12,7 +12,7 @@ import { useDetailContext } from './DetailProvider';
 
 const Header = memo<{ mobile?: boolean }>(({ mobile: isMobile }) => {
   const { t } = useTranslation('providers');
-  const { description, identifier, url, modelsUrl, name } = useDetailContext();
+  const { identifier, url, modelsUrl, name } = useDetailContext();
   const { mobile = isMobile } = useResponsive();
 
   return (
@@ -73,7 +73,7 @@ const Header = memo<{ mobile?: boolean }>(({ mobile: isMobile }) => {
           color: cssVar.colorTextSecondary,
         }}
       >
-        {t(`${identifier}.description`, { defaultValue: description })}
+        {t(`${identifier}.description`)}
       </Flexbox>
     </Flexbox>
   );

@@ -1,4 +1,3 @@
-import { confirmModal } from '@lobehub/ui/base-ui';
 import { App } from 'antd';
 import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -7,7 +6,13 @@ import type { KeyedMutator } from 'swr';
 import { agentDocumentService } from '@/services/agentDocument';
 
 import type { AgentDocumentItem } from '../types';
-import { isPendingId, isProtectedManagedSkillItem } from '../types';
+import {
+  FOLDER_FILE_TYPE,
+  isManagedSkillItem,
+  isPendingId,
+  isProtectedManagedSkillItem,
+  isSkillBundleItem,
+} from '../types';
 import { makePendingDocument } from '../utils/pendingDocument';
 
 interface UseDocumentTreeOpsArgs {
@@ -45,7 +50,7 @@ export interface CreateOptions {
 export interface DocumentTreeOps {
   createDocument: (parentId: string | null, opts?: CreateOptions) => Promise<void>;
   createFolder: (parentId: string | null, opts?: CreateOptions) => Promise<void>;
-  deleteDocuments: (ids: string[]) => void;
+  deleteDocument: (id: string) => void;
   moveDocument: (params: {
     sourceIds: string[];
     sourceNodes: { data?: AgentDocumentItem }[];
@@ -61,7 +66,7 @@ export const useDocumentTreeOps = ({
   topicId,
 }: UseDocumentTreeOpsArgs): DocumentTreeOps => {
   const { t } = useTranslation(['chat', 'common']);
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const dataRef = useRef(data);
   dataRef.current = data;
 
@@ -103,7 +108,7 @@ export const useDocumentTreeOps = ({
       if (parentRowId === null) return ROOT_PATH;
       const parent = byRowId.get(parentRowId);
       if (!parent) return null;
-      if (parent.category === 'skill') return null;
+      if (isManagedSkillItem(parent)) return null;
       return buildItemPath(parent);
     },
     [byRowId, buildItemPath],
@@ -239,7 +244,7 @@ export const useDocumentTreeOps = ({
     async (id: string, newName: string) => {
       const target = dataRef.current.find((doc) => doc.id === id);
       if (!target) return;
-      if (target.category === 'skill') return;
+      if (isManagedSkillItem(target)) return;
 
       const trimmed = newName.trim();
       if (!trimmed) {
@@ -304,7 +309,7 @@ export const useDocumentTreeOps = ({
       }
 
       const targetItem = targetId ? byRowId.get(targetId) : null;
-      if (targetItem?.isSkillBundle) return;
+      if (targetItem && isSkillBundleItem(targetItem)) return;
 
       const targetParentDocId = targetItem ? targetItem.documentId : null;
 
@@ -312,7 +317,7 @@ export const useDocumentTreeOps = ({
       for (const id of sourceIds) {
         const node = sourceNodes.find((n) => n.data?.id === id)?.data;
         if (!node) continue;
-        if (node.category === 'skill') return;
+        if (isManagedSkillItem(node)) return;
         const fromPath = buildItemPath(node);
         if (!fromPath) continue;
         const toPath = joinPath(targetParentPath, node.filename);
@@ -355,70 +360,38 @@ export const useDocumentTreeOps = ({
     [agentId, buildItemPath, buildParentPathFromRowId, byRowId, message, mutate, t],
   );
 
-  const deleteDocuments = useCallback(
-    (ids: string[]) => {
-      const uniqueIds = Array.from(new Set(ids));
-      const resolved = uniqueIds
-        .map((id) => dataRef.current.find((doc) => doc.id === id))
-        .filter((doc): doc is AgentDocumentItem => !!doc)
-        .filter((doc) => !isProtectedManagedSkillItem(doc, dataRef.current));
+  const deleteDocument = useCallback(
+    (id: string) => {
+      const target = dataRef.current.find((doc) => doc.id === id);
+      if (!target) return;
+      if (isProtectedManagedSkillItem(target, dataRef.current)) return;
 
-      if (resolved.length === 0) return;
-
-      // When a selected folder is an ancestor of another selection, skip the
-      // descendant — the folder's recursive delete already covers it.
-      const docById = new Map(dataRef.current.map((doc) => [doc.documentId, doc]));
-      const folderDocIds = new Set(
-        resolved.filter((doc) => doc.isFolder && !doc.isSkillBundle).map((doc) => doc.documentId),
-      );
-      const hasAncestorIn = (item: AgentDocumentItem, ancestors: Set<string>): boolean => {
-        let cursor = item.parentId;
-        while (cursor) {
-          if (ancestors.has(cursor)) return true;
-          cursor = docById.get(cursor)?.parentId ?? null;
-        }
-        return false;
-      };
-      const targets = resolved.filter((doc) => !hasAncestorIn(doc, folderDocIds));
-
-      if (targets.length === 0) return;
-
-      confirmModal({
+      modal.confirm({
         cancelText: t('cancel', { ns: 'common' }),
+        centered: true,
         content: t('workingPanel.resources.deleteConfirm'),
-        okButtonProps: { danger: true },
+        okButtonProps: { danger: true, type: 'primary' },
         okText: t('delete', { ns: 'common' }),
         onOk: () => {
-          const removedIds = new Set<string>();
-          const plans: Array<
-            | { kind: 'folder'; path: string; target: AgentDocumentItem }
-            | { kind: 'row'; target: AgentDocumentItem }
-          > = [];
+          const isFolder = target.fileType === FOLDER_FILE_TYPE;
+          const folderPath = isFolder ? buildItemPath(target) : null;
+          if (isFolder && folderPath === null) {
+            message.error(t('workingPanel.resources.tree.parentMissing'));
+            return;
+          }
 
-          for (const target of targets) {
-            // Skill bundles are removed via the bundle row, not path-based
-            // recursive removal.
-            const isFolder = target.isFolder && !target.isSkillBundle;
-            if (isFolder) {
-              const folderPath = buildItemPath(target);
-              if (!folderPath) {
-                message.error(t('workingPanel.resources.tree.parentMissing'));
-                return;
-              }
-              plans.push({ kind: 'folder', path: folderPath, target });
-            } else {
-              plans.push({ kind: 'row', target });
-            }
-            removedIds.add(target.id);
-            if (isFolder) {
-              const queue: string[] = [target.documentId];
-              while (queue.length > 0) {
-                const parentDocId = queue.shift()!;
-                for (const doc of dataRef.current) {
-                  if (doc.parentId === parentDocId && !removedIds.has(doc.id)) {
-                    removedIds.add(doc.id);
-                    queue.push(doc.documentId);
-                  }
+          // Collect target + all descendants (parentId chain via documentId) for
+          // optimistic recursive removal. Server is the source of truth and a
+          // final `mutate()` reconciles either way.
+          const removedIds = new Set<string>([target.id]);
+          if (isFolder) {
+            const queue: string[] = [target.documentId];
+            while (queue.length > 0) {
+              const parentDocId = queue.shift()!;
+              for (const doc of dataRef.current) {
+                if (doc.parentId === parentDocId && !removedIds.has(doc.id)) {
+                  removedIds.add(doc.id);
+                  queue.push(doc.documentId);
                 }
               }
             }
@@ -429,62 +402,49 @@ export const useDocumentTreeOps = ({
             revalidate: false,
           });
 
+          // Returning synchronously closes the modal immediately; the server
+          // call runs in the background and toasts on success/rollback.
           void (async () => {
-            const errors: Error[] = [];
-            await Promise.all(
-              plans.map(async (plan) => {
-                try {
-                  if (plan.kind === 'folder') {
-                    await agentDocumentService.deleteByPath({
-                      agentId,
-                      path: plan.path,
-                      recursive: true,
-                    });
-                  } else {
-                    await agentDocumentService.removeDocument({
-                      agentId,
-                      documentId: plan.target.documentId,
-                      id: plan.target.id,
-                      topicId,
-                    });
-                  }
-                } catch (error) {
-                  errors.push(error instanceof Error ? error : new Error(String(error)));
-                }
-              }),
-            );
-
-            if (errors.length === plans.length) {
+            try {
+              if (isFolder) {
+                await agentDocumentService.deleteByPath({
+                  agentId,
+                  path: folderPath!,
+                  recursive: true,
+                });
+              } else {
+                await agentDocumentService.removeDocument({
+                  agentId,
+                  documentId: target.documentId,
+                  id: target.id,
+                  topicId,
+                });
+              }
+              await mutate();
+            } catch (error) {
               mutate(snapshot, { revalidate: false });
-              const detail = errors.map((e) => e.message).join('; ');
-              message.error(`${t('workingPanel.resources.deleteError')}: ${detail}`);
-              return;
-            }
-
-            await mutate();
-            if (errors.length > 0) {
-              const detail = errors.map((e) => e.message).join('; ');
-              message.error(`${t('workingPanel.resources.deleteError')}: ${detail}`);
+              message.error(
+                error instanceof Error
+                  ? `${t('workingPanel.resources.deleteError')}: ${error.message}`
+                  : t('workingPanel.resources.deleteError'),
+              );
             }
           })();
         },
-        title:
-          targets.length > 1
-            ? t('workingPanel.resources.deleteTitleMulti', { count: targets.length })
-            : t('workingPanel.resources.deleteTitle'),
+        title: t('workingPanel.resources.deleteTitle'),
       });
     },
-    [agentId, buildItemPath, message, mutate, t, topicId],
+    [agentId, buildItemPath, message, modal, mutate, t, topicId],
   );
 
   return useMemo(
     () => ({
       createDocument,
       createFolder,
-      deleteDocuments,
+      deleteDocument,
       moveDocument,
       renameDocument,
     }),
-    [createDocument, createFolder, deleteDocuments, moveDocument, renameDocument],
+    [createDocument, createFolder, deleteDocument, moveDocument, renameDocument],
   );
 };

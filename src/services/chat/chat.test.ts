@@ -81,6 +81,7 @@ const createMockResolvedConfig = (overrides?: {
     },
     chatConfig: {
       searchMode: 'off',
+      autoCreateTopicThreshold: 2,
       ...overrides?.chatConfig,
     },
     enabledManifests: overrides?.enabledManifests ?? [],
@@ -632,7 +633,7 @@ describe('ChatService', () => {
                     // literal captured in contextEngineering.ts at import time, so the
                     // spy has no effect on the downstream pipeline. The effective
                     // behavior is therefore vision=disabled, and the image is
-                    // downgraded to a placeholder (see ).
+                    // downgraded to a placeholder (see LOBE-7214).
                     text: `Hello
 
 [image omitted: not supported by this model]

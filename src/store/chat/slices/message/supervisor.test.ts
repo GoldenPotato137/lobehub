@@ -60,21 +60,18 @@ describe('GroupChatSupervisor', () => {
   it('should request structured completion and return filtered decisions', async () => {
     const logSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
 
-    vi.mocked(aiChatService.generateJSON).mockResolvedValue({
-      data: [
-        { tool_name: 'create_todo', parameter: { content: 'Review action items' } },
-        { tool_name: 'create_todo', parameter: { content: 'Prepare summary' } },
-        {
-          tool_name: 'trigger_agent',
-          parameter: { id: 'agent-1', instruction: 'Say hello', target: 'user' },
-        },
-        {
-          tool_name: 'trigger_agent',
-          parameter: { id: 'unknown-agent', instruction: 'Ignore me' },
-        },
-      ],
-      tracingId: '00000000-0000-0000-0000-000000000001',
-    } as any);
+    vi.mocked(aiChatService.generateJSON).mockResolvedValue([
+      { tool_name: 'create_todo', parameter: { content: 'Review action items' } },
+      { tool_name: 'create_todo', parameter: { content: 'Prepare summary' } },
+      {
+        tool_name: 'trigger_agent',
+        parameter: { id: 'agent-1', instruction: 'Say hello', target: 'user' },
+      },
+      {
+        tool_name: 'trigger_agent',
+        parameter: { id: 'unknown-agent', instruction: 'Ignore me' },
+      },
+    ]);
 
     const result = await supervisor.makeDecision({ ...baseContext });
 
@@ -137,10 +134,7 @@ describe('GroupChatSupervisor', () => {
       '```',
     ].join('\n');
 
-    vi.mocked(aiChatService.generateJSON).mockResolvedValue({
-      data: payload,
-      tracingId: '00000000-0000-0000-0000-000000000002',
-    } as any);
+    vi.mocked(aiChatService.generateJSON).mockResolvedValue(payload);
 
     const result = await supervisor.makeDecision({ ...baseContext });
 

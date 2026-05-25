@@ -29,10 +29,7 @@ vi.mock('@/services/agentDocument', () => ({
   agentDocumentService: {
     getDocuments: vi.fn(),
   },
-}));
-
-vi.mock('@/utils/agentDocumentContextMapping', () => ({
-  toAgentContextDocuments: (documents: any[]) =>
+  mapAgentDocumentsToContext: (documents: any[]) =>
     documents.map((doc) => ({
       content: doc.content,
       filename: doc.filename,

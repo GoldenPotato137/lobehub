@@ -14,10 +14,10 @@ import { cssVar, cx } from 'antd-style';
 import { LucideArrowRight, LucideBolt } from 'lucide-react';
 import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 import urlJoin from 'url-join';
 
 import { ModelItemRender, ProviderItemRender } from '@/components/ModelSelect';
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
 import { useUserStore } from '@/store/user';
 import { userGeneralSettingsSelectors } from '@/store/user/selectors';
 
@@ -53,7 +53,7 @@ export const ListItemRenderer = memo<ListItemRendererProps>(
     subscribeScroll,
   }) => {
     const { t } = useTranslation('components');
-    const navigate = useNavigate();
+    const navigate = useWorkspaceAwareNavigate();
     const isDevMode = useUserStore((s) => userGeneralSettingsSelectors.config(s).isDevMode);
     const [detailOpen, setDetailOpen] = useState(false);
 

@@ -59,7 +59,7 @@ export const useClientTaskStats = ({
   );
 
   // Fetch thread messages (skip when disabled or no threadId)
-  useFetchMessages(threadContext, { skipFetch: !enabled || !threadId });
+  useFetchMessages(threadContext, !enabled || !threadId);
 
   // Get thread messages from store using selector
   const threadMessages = useChatStore((s) =>

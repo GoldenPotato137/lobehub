@@ -4,7 +4,6 @@ import { COPYRIGHT_FULL } from '@lobechat/business-const';
 import { Center, Flexbox, Text } from '@lobehub/ui';
 import { Divider } from 'antd';
 import { cx } from 'antd-style';
-import Link from 'next/link';
 import { type FC, type PropsWithChildren } from 'react';
 
 import { ProductLogo } from '@/components/Branding';
@@ -31,9 +30,7 @@ const AuthContainer: FC<PropsWithChildren> = ({ children }) => {
           padding={16}
           width={'100%'}
         >
-          <Link aria-label={'LobeHub'} href={'/'} style={{ display: 'inline-flex' }}>
-            <ProductLogo size={40} />
-          </Link>
+          <ProductLogo size={40} />
           <Flexbox horizontal align={'center'}>
             <AuthLangButton size={18} />
             <Divider className={styles.divider} orientation={'vertical'} />

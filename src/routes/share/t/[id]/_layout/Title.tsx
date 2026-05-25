@@ -6,6 +6,7 @@ import { memo, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import useSWR from 'swr';
 
+import PageTitle from '@/components/PageTitle';
 import { lambdaClient } from '@/libs/trpc/client';
 import { useAgentStore } from '@/store/agent';
 import { useAgentGroupStore } from '@/store/agentGroup';
@@ -81,9 +82,12 @@ const Title = memo(() => {
 
   return (
     data?.title && (
-      <Text ellipsis strong align={'center'} fontSize={16} style={{ textAlign: 'center' }}>
-        {data.title}
-      </Text>
+      <>
+        <PageTitle title={data.title} />
+        <Text ellipsis strong align={'center'} fontSize={16} style={{ textAlign: 'center' }}>
+          {data.title}
+        </Text>
+      </>
     )
   );
 });

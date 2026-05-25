@@ -21,6 +21,7 @@ import { and, asc, eq, gte, lte } from 'drizzle-orm';
 import pMap from 'p-map';
 import { z } from 'zod';
 
+import { withScopedPermission } from '@/business/server/trpc-middlewares/rbacPermission';
 import {
   type IdentityEntryBasePayload,
   type IdentityEntryPayload,
@@ -235,6 +236,7 @@ const normalizeEmbeddable = (value?: string | null): string | undefined => {
 
 const memoryProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
   const { ctx } = opts;
+  const wsId = ctx.workspaceId ?? undefined;
   const userSettingsRow = await ctx.serverDB.query.userSettings.findFirst({
     columns: { memory: true },
     where: eq(userSettings.id, ctx.userId),
@@ -247,14 +249,15 @@ const memoryProcedure = authedProcedure.use(serverDatabase).use(async (opts) => 
 
   return opts.next({
     ctx: {
-      activityModel: new UserMemoryActivityModel(ctx.serverDB, ctx.userId),
-      experienceModel: new UserMemoryExperienceModel(ctx.serverDB, ctx.userId),
-      identityModel: new UserMemoryIdentityModel(ctx.serverDB, ctx.userId),
-      memoryModel: new UserMemoryModel(ctx.serverDB, ctx.userId),
+      activityModel: new UserMemoryActivityModel(ctx.serverDB, ctx.userId, wsId),
+      experienceModel: new UserMemoryExperienceModel(ctx.serverDB, ctx.userId, wsId),
+      identityModel: new UserMemoryIdentityModel(ctx.serverDB, ctx.userId, wsId),
+      memoryModel: new UserMemoryModel(ctx.serverDB, ctx.userId, wsId),
       memoryEffort,
     },
   });
 });
+const memoryWriteProcedure = memoryProcedure.use(withScopedPermission('message:create'));
 
 export const userMemoriesRouter = router({
   getMemoryDetail: memoryProcedure
@@ -453,7 +456,7 @@ export const userMemoriesRouter = router({
       }
     }),
 
-  reEmbedMemories: memoryProcedure
+  reEmbedMemories: memoryWriteProcedure
     .input(reEmbedInputSchema.optional())
     .mutation(async ({ ctx, input }) => {
       try {
@@ -964,7 +967,7 @@ export const userMemoriesRouter = router({
     }
   }),
 
-  toolAddActivityMemory: memoryProcedure
+  toolAddActivityMemory: memoryWriteProcedure
     .input(ActivityMemoryItemSchema)
     .mutation(async ({ input, ctx }) => {
       try {
@@ -1026,7 +1029,7 @@ export const userMemoriesRouter = router({
       }
     }),
 
-  toolAddContextMemory: memoryProcedure
+  toolAddContextMemory: memoryWriteProcedure
     .input(ContextMemoryItemSchema)
     .mutation(async ({ input, ctx }) => {
       try {
@@ -1081,7 +1084,7 @@ export const userMemoriesRouter = router({
       }
     }),
 
-  toolAddExperienceMemory: memoryProcedure
+  toolAddExperienceMemory: memoryWriteProcedure
     .input(ExperienceMemoryItemSchema)
     .mutation(async ({ input, ctx }) => {
       try {
@@ -1137,7 +1140,7 @@ export const userMemoriesRouter = router({
       }
     }),
 
-  toolAddIdentityMemory: memoryProcedure
+  toolAddIdentityMemory: memoryWriteProcedure
     .input(AddIdentityActionSchema)
     .mutation(async ({ input, ctx }) => {
       try {
@@ -1205,7 +1208,7 @@ export const userMemoriesRouter = router({
       }
     }),
 
-  toolAddPreferenceMemory: memoryProcedure
+  toolAddPreferenceMemory: memoryWriteProcedure
     .input(PreferenceMemoryItemSchema)
     .mutation(async ({ input, ctx }) => {
       try {
@@ -1265,7 +1268,7 @@ export const userMemoriesRouter = router({
       }
     }),
 
-  toolRemoveIdentityMemory: memoryProcedure
+  toolRemoveIdentityMemory: memoryWriteProcedure
     .input(RemoveIdentityActionSchema)
     .mutation(async ({ input, ctx }) => {
       try {
@@ -1298,7 +1301,7 @@ export const userMemoriesRouter = router({
     return result;
   }),
 
-  toolUpdateIdentityMemory: memoryProcedure
+  toolUpdateIdentityMemory: memoryWriteProcedure
     .input(UpdateIdentityActionSchema)
     .mutation(async ({ input, ctx }) => {
       try {

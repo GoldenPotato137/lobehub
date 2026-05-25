@@ -1,6 +1,4 @@
 // @vitest-environment node
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
@@ -40,25 +38,12 @@ describe('loadFile', () => {
     expect(doc.metadata.error).toContain('Failed to access file stats:');
   });
 
-  it('rejects unsupported binary-like file types before text parsing', async () => {
+  it('falls back to TextLoader for unsupported type and warns', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const tempDir = await mkdtemp(path.join(tmpdir(), 'lobe-file-loaders-'));
-
-    try {
-      const file = path.join(tempDir, 'archive.zip');
-      await writeFile(file, Buffer.from([80, 75, 3, 4, 0, 0]));
-
-      await expect(loadFile(file)).rejects.toMatchObject({
-        fileType: 'zip',
-        name: 'UnsupportedFileTypeError',
-      });
-      expect(warn).toHaveBeenCalledWith(
-        "No specific loader found for file type 'zip'. Rejecting unsupported file type.",
-      );
-    } finally {
-      warn.mockRestore();
-      await rm(tempDir, { force: true, recursive: true });
-    }
+    const doc = await loadFile(fp('test.epub')); // epub is unsupported in current mapping
+    expect(warn).toHaveBeenCalled();
+    expect(doc.content.length).toBeGreaterThanOrEqual(0);
+    warn.mockRestore();
   });
 
   it('allows overriding metadata via second parameter', async () => {

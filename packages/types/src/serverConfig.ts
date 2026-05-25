@@ -7,7 +7,7 @@ import type {
   GlobalLLMProviderKey,
   UserDefaultAgent,
   UserImageConfig,
-  UserServiceModelConfig,
+  UserSystemAgentConfig,
 } from './user/settings';
 
 export type GlobalMemoryLayer = 'activity' | 'context' | 'experience' | 'identity' | 'preference';
@@ -76,7 +76,7 @@ export interface GlobalServerConfig {
   image?: PartialDeep<UserImageConfig>;
   memory?: GlobalMemoryConfig;
   oAuthSSOProviders?: string[];
-  systemAgent?: PartialDeep<UserServiceModelConfig>;
+  systemAgent?: PartialDeep<UserSystemAgentConfig>;
   telemetry: {
     langfuse?: boolean;
   };

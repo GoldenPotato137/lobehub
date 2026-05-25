@@ -1,6 +1,5 @@
 import { SpanStatusCode } from '@lobechat/observability-otel/api';
 import { tracer } from '@lobechat/observability-otel/modules/agent-signal';
-import { pickString, pickTrimmedString } from '@lobechat/utils';
 
 import type { ToolSet, ToolWriteResult } from '../tools/shared';
 import type { RunResult } from '../types';
@@ -66,6 +65,14 @@ const toApplyResult = (
   status,
   summary,
 });
+
+const getOptionalString = (value: unknown) => (typeof value === 'string' ? value : undefined);
+
+const getRequiredString = (value: unknown) => {
+  const text = getOptionalString(value)?.trim();
+
+  return text || undefined;
+};
 
 const mapToolStatus = (result: ToolWriteResult): SelfReviewProposalActionApplyResult['status'] => {
   if (result.status === 'applied') return 'applied';
@@ -158,9 +165,9 @@ const prepareToolAction = (
     }
 
     const operationInput = action.operation.input as unknown as Record<string, unknown>;
-    const bodyMarkdown = pickTrimmedString(operationInput.bodyMarkdown);
-    const canonicalSkillDocumentId = pickTrimmedString(operationInput.canonicalSkillDocumentId);
-    const description = pickString(operationInput.description);
+    const bodyMarkdown = getRequiredString(operationInput.bodyMarkdown);
+    const canonicalSkillDocumentId = getRequiredString(operationInput.canonicalSkillDocumentId);
+    const description = getOptionalString(operationInput.description);
 
     if (!bodyMarkdown || !canonicalSkillDocumentId) {
       return toApplyResult(
@@ -201,9 +208,9 @@ const prepareToolAction = (
 
     const operation = action.operation;
     const operationInput = operation.input as unknown as Record<string, unknown>;
-    const bodyMarkdown = pickTrimmedString(operation.input.bodyMarkdown);
-    const description = pickString(operationInput.description);
-    const skillDocumentId = pickTrimmedString(operation.input.skillDocumentId);
+    const bodyMarkdown = getRequiredString(operation.input.bodyMarkdown);
+    const description = getOptionalString(operationInput.description);
+    const skillDocumentId = getRequiredString(operation.input.skillDocumentId);
 
     if (!bodyMarkdown || !skillDocumentId) {
       return toApplyResult(
@@ -239,10 +246,10 @@ const prepareToolAction = (
     }
 
     const operation = action.operation;
-    const bodyMarkdown = pickTrimmedString(operation.input.bodyMarkdown);
-    const description = pickString(operation.input.description);
-    const name = pickTrimmedString(operation.input.name);
-    const title = pickString(operation.input.title);
+    const bodyMarkdown = getRequiredString(operation.input.bodyMarkdown);
+    const description = getOptionalString(operation.input.description);
+    const name = getRequiredString(operation.input.name);
+    const title = getOptionalString(operation.input.title);
 
     if (!bodyMarkdown || !name) {
       return toApplyResult(

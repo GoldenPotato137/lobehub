@@ -9,6 +9,8 @@ import { topicSelectors } from '@/store/chat/selectors';
 import AgentDocumentsGroup from './AgentDocumentsGroup';
 import SkillsGroup from './SkillsGroup';
 
+export type ResourceViewMode = 'list' | 'tree';
+
 const ResourcesSection = memo(() => {
   const isHetero = useAgentStore(agentSelectors.isCurrentAgentHeterogeneous);
   const activeAgentId = useAgentStore((s) => s.activeAgentId);
@@ -28,12 +30,7 @@ const ResourcesSection = memo(() => {
       style={{ minHeight: 0 }}
     >
       {isHetero && workingDirectory && <SkillsGroup workingDirectory={workingDirectory} />}
-      {!isHetero && (
-        <AgentDocumentsGroup
-          style={{ flex: 1, minHeight: 0 }}
-          workingDirectory={workingDirectory}
-        />
-      )}
+      {!isHetero && <AgentDocumentsGroup style={{ flex: 1, minHeight: 0 }} viewMode={'list'} />}
     </Flexbox>
   );
 });

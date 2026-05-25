@@ -7,10 +7,6 @@ const log = debug('lobe-server:hetero-sandbox-runner');
 
 export interface SandboxRunParams {
   agentType: 'claude-code' | 'codex';
-  /** Initial assistant placeholder message id — injected as LOBEHUB_ASSISTANT_MESSAGE_ID so
-   * the CLI can pass it through the heteroIngest payload, removing the need for the server
-   * to re-read topic.metadata.runningOperation on every cold Lambda start. */
-  assistantMessageId: string;
   cwd?: string;
   /** GitHub OAuth token for cloning private repos. */
   githubToken?: string;
@@ -109,7 +105,6 @@ function buildRepoSetupScript(repos: string[], githubToken?: string): string | n
 export async function spawnHeteroSandbox(params: SandboxRunParams): Promise<void> {
   const {
     agentType,
-    assistantMessageId,
     githubToken,
     jwt,
     marketService,
@@ -171,7 +166,6 @@ export async function spawnHeteroSandbox(params: SandboxRunParams): Promise<void
   const envVars = [
     `LOBEHUB_JWT=${JSON.stringify(jwt)}`,
     `LOBEHUB_SERVER=${JSON.stringify(serverUrl)}`,
-    `LOBEHUB_ASSISTANT_MESSAGE_ID=${JSON.stringify(assistantMessageId)}`,
     // Inject GitHub token so CC can authenticate git operations and GitHub API
     // calls inside the sandbox (e.g. gh CLI, git push, API requests).
     ...(githubToken ? [`GITHUB_TOKEN=${JSON.stringify(githubToken)}`] : []),

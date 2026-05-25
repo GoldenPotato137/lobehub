@@ -1,10 +1,4 @@
-import type {
-  Content,
-  GenerateContentConfig,
-  GenerateContentResponse,
-  GoogleGenAI,
-  Part,
-} from '@google/genai';
+import type { Content, GenerateContentConfig, GoogleGenAI, Part } from '@google/genai';
 import { imageUrlToBase64 } from '@lobechat/utils';
 
 import { convertGoogleAIUsage } from '../../core/usageConverters/google-ai';
@@ -16,45 +10,6 @@ import { parseDataUri } from '../../utils/uriParser';
 
 // Maximum number of images allowed for processing
 const MAX_IMAGE_COUNT = 10;
-
-export const GOOGLE_IMAGE_TEXT_ONLY_RESPONSE_MESSAGE = [
-  'The model returned text instead of an image.',
-  'Ask it to generate or edit an image, or try a safer prompt if the request may have been blocked.',
-].join(' ');
-
-interface ErrorWithRawProviderResponse extends Error {
-  providerResponse?: GenerateContentResponse;
-}
-
-// Keep raw provider responses available to upstream error handlers without
-// exposing text-only no-image responses through JSON serialization.
-const attachNonSerializableProviderResponse = <T extends object>(
-  target: T,
-  response: GenerateContentResponse,
-): T & { providerResponse?: GenerateContentResponse } => {
-  Object.defineProperty(target, 'providerResponse', {
-    configurable: true,
-    enumerable: false,
-    value: response,
-  });
-
-  return target;
-};
-
-const createGoogleImageNoImageError = (
-  message: string,
-  response: GenerateContentResponse,
-): ErrorWithRawProviderResponse =>
-  attachNonSerializableProviderResponse(
-    new Error(message),
-    response,
-  ) as ErrorWithRawProviderResponse;
-
-const getTextFromParts = (parts: Part[]) =>
-  parts
-    .map((part) => part.text?.trim())
-    .filter(Boolean)
-    .join('\n');
 
 /**
  * Process a single image URL and convert it to Google AI Part format
@@ -90,15 +45,14 @@ async function processImageForParts(imageUrl: string): Promise<Part> {
 /**
  * Extract image data from generateContent response
  */
-function extractImageFromResponse(response: GenerateContentResponse): CreateImageResponse {
+function extractImageFromResponse(response: any): CreateImageResponse {
   const candidate = response.candidates?.[0];
-
   if (candidate?.finishReason === 'NO_IMAGE') {
-    throw createGoogleImageNoImageError('No image generated', response);
+    throw new Error('No image generated');
   }
   if (!candidate?.content?.parts) {
     // Handle cases where Google returns 200 but omits image parts (often moderation)
-    throw createGoogleImageNoImageError('No image generated', response);
+    throw new Error('No image generated');
   }
 
   for (const part of candidate.content.parts) {
@@ -108,12 +62,8 @@ function extractImageFromResponse(response: GenerateContentResponse): CreateImag
     }
   }
 
-  if (candidate.finishReason === 'STOP' && getTextFromParts(candidate.content.parts)) {
-    throw createGoogleImageNoImageError(GOOGLE_IMAGE_TEXT_ONLY_RESPONSE_MESSAGE, response);
-  }
-
   // Fallback when no inlineData is present (commonly moderation or policy blocks)
-  throw createGoogleImageNoImageError('No image data found in response', response);
+  throw new Error('No image data found in response');
 }
 
 /**
@@ -191,21 +141,16 @@ async function generateImageByChatModel(
     },
   ];
 
-  // Build imageConfig independently for aspectRatio and resolution so that
-  // selecting only one (e.g. resolution=4K while aspectRatio stays 'auto')
-  // still reaches the Google API. Previously both fields were gated on
-  // aspectRatio !== 'auto', which silently dropped the user's resolution.
-  const imageConfig: { aspectRatio?: string; imageSize?: string } = {};
-  if (params.aspectRatio && params.aspectRatio !== 'auto') {
-    imageConfig.aspectRatio = params.aspectRatio;
-  }
-  if (params.resolution) {
-    imageConfig.imageSize = params.resolution;
-  }
-
   const config: GenerateContentConfig = {
-    responseModalities: ['TEXT', 'IMAGE'],
-    ...(Object.keys(imageConfig).length > 0 ? { imageConfig } : {}),
+    responseModalities: ['Image'],
+    ...(params.aspectRatio && params.aspectRatio !== 'auto'
+      ? {
+          imageConfig: {
+            aspectRatio: params.aspectRatio,
+            imageSize: params.resolution,
+          },
+        }
+      : {}),
   };
 
   const response = await client.models.generateContent({
@@ -249,17 +194,10 @@ export async function createGoogleImage(
     }
 
     const { errorType, error: parsedError } = parseGoogleErrorMessage(err.message);
-    const providerResponse = (err as ErrorWithRawProviderResponse).providerResponse;
-    const agentError = AgentRuntimeError.createImage({
+    throw AgentRuntimeError.createImage({
       error: parsedError,
       errorType,
       provider,
     });
-
-    if (providerResponse) {
-      attachNonSerializableProviderResponse(agentError, providerResponse);
-    }
-
-    throw agentError;
   }
 }

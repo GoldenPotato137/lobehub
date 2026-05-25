@@ -3,7 +3,6 @@ import {
   type UniformSearchResponse,
   type UniformSearchResult,
 } from '@lobechat/types';
-import { getJinaSearchBaseUrl } from '@lobechat/utils';
 import { TRPCError } from '@trpc/server';
 import debug from 'debug';
 import urlJoin from 'url-join';
@@ -23,7 +22,8 @@ export class JinaImpl implements SearchServiceImpl {
   }
 
   private get baseUrl(): string {
-    return getJinaSearchBaseUrl();
+    // Assuming the base URL is consistent with the crawl endpoint
+    return 'https://s.jina.ai';
   }
 
   async query(query: string, params: SearchParams = {}): Promise<UniformSearchResponse> {

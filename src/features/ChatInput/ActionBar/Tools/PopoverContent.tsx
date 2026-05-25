@@ -4,7 +4,8 @@ import { createStaticStyles, cssVar } from 'antd-style';
 import { ChevronRight, ExternalLink, Settings, Store } from 'lucide-react';
 import { memo, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
 
 import { ScrollSignalProvider } from './ScrollSignalContext';
 import SkillActivateMode from './SkillActivateMode';
@@ -57,7 +58,7 @@ interface PopoverContentProps {
 
 const PopoverContent = memo<PopoverContentProps>(({ items, onOpenStore }) => {
   const { t } = useTranslation('setting');
-  const navigate = useNavigate();
+  const navigate = useWorkspaceAwareNavigate();
   const [searchKeyword, setSearchKeyword] = useState('');
 
   const { close: closePopover } = usePopoverContext();

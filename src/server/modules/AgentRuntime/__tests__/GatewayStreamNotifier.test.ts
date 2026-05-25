@@ -131,27 +131,21 @@ describe('GatewayStreamNotifier', () => {
     it('delegates to inner and returns its result', async () => {
       const finalState = { status: 'done' };
 
-      const params = {
-        finalState,
-        operationId: 'op-1',
-        reason: 'completed',
-        stepIndex: 2,
-      };
-      const result = await notifier.publishAgentRuntimeEnd(params);
+      const result = await notifier.publishAgentRuntimeEnd('op-1', 2, finalState, 'completed');
 
       expect(result).toBe('publishAgentRuntimeEnd-result');
       expect(inner.calls.publishAgentRuntimeEnd).toHaveLength(1);
-      expect(inner.calls.publishAgentRuntimeEnd[0]).toEqual([params]);
+      expect(inner.calls.publishAgentRuntimeEnd[0]).toEqual([
+        'op-1',
+        2,
+        finalState,
+        'completed',
+        undefined,
+      ]);
     });
 
     it('calls gateway push-event endpoint only (no update-status)', async () => {
-      await notifier.publishAgentRuntimeEnd({
-        finalState: {},
-        operationId: 'op-1',
-        reason: 'completed',
-        reasonDetail: 'All done',
-        stepIndex: 2,
-      });
+      await notifier.publishAgentRuntimeEnd('op-1', 2, {}, 'completed', 'All done');
 
       await new Promise((r) => setTimeout(r, 50));
 
@@ -169,12 +163,7 @@ describe('GatewayStreamNotifier', () => {
         },
       };
 
-      await notifier.publishAgentRuntimeEnd({
-        finalState,
-        operationId: 'op-1',
-        reason: 'error',
-        stepIndex: 0,
-      });
+      await notifier.publishAgentRuntimeEnd('op-1', 0, finalState, 'error');
       await new Promise((r) => setTimeout(r, 50));
 
       const pushCall = mockFetch.mock.calls.find((c: any[]) => c[0].includes('push-event'));
@@ -187,13 +176,7 @@ describe('GatewayStreamNotifier', () => {
         error: { message: 'Some error' },
       };
 
-      await notifier.publishAgentRuntimeEnd({
-        finalState,
-        operationId: 'op-1',
-        reason: 'error',
-        reasonDetail: 'Custom detail',
-        stepIndex: 0,
-      });
+      await notifier.publishAgentRuntimeEnd('op-1', 0, finalState, 'error', 'Custom detail');
       await new Promise((r) => setTimeout(r, 50));
 
       const pushCall = mockFetch.mock.calls.find((c: any[]) => c[0].includes('push-event'));
@@ -206,12 +189,7 @@ describe('GatewayStreamNotifier', () => {
         error: { message: 'Budget exceeded', type: 'InsufficientBudgetForModel' },
       };
 
-      await notifier.publishAgentRuntimeEnd({
-        finalState,
-        operationId: 'op-1',
-        reason: 'error',
-        stepIndex: 0,
-      });
+      await notifier.publishAgentRuntimeEnd('op-1', 0, finalState, 'error');
       await new Promise((r) => setTimeout(r, 50));
 
       const pushCall = mockFetch.mock.calls.find((c: any[]) => c[0].includes('push-event'));
@@ -227,12 +205,7 @@ describe('GatewayStreamNotifier', () => {
         },
       };
 
-      await notifier.publishAgentRuntimeEnd({
-        finalState,
-        operationId: 'op-1',
-        reason: 'error',
-        stepIndex: 0,
-      });
+      await notifier.publishAgentRuntimeEnd('op-1', 0, finalState, 'error');
       await new Promise((r) => setTimeout(r, 50));
 
       const pushCall = mockFetch.mock.calls.find((c: any[]) => c[0].includes('push-event'));
@@ -241,48 +214,12 @@ describe('GatewayStreamNotifier', () => {
     });
 
     it('errorType is undefined when no error in finalState', async () => {
-      await notifier.publishAgentRuntimeEnd({
-        finalState: { status: 'done' },
-        operationId: 'op-1',
-        reason: 'completed',
-        stepIndex: 0,
-      });
+      await notifier.publishAgentRuntimeEnd('op-1', 0, { status: 'done' }, 'completed');
       await new Promise((r) => setTimeout(r, 50));
 
       const pushCall = mockFetch.mock.calls.find((c: any[]) => c[0].includes('push-event'));
       const body = JSON.parse(pushCall![1].body);
       expect(body.event.data.errorType).toBeUndefined();
-    });
-
-    it('forwards uiMessages to the gateway push payload when provided', async () => {
-      const uiMessages = [{ id: 'msg_z', role: 'assistantGroup' }] as any;
-
-      await notifier.publishAgentRuntimeEnd({
-        finalState: { status: 'done' },
-        operationId: 'op-1',
-        reason: 'completed',
-        stepIndex: 4,
-        uiMessages,
-      });
-      await new Promise((r) => setTimeout(r, 50));
-
-      const pushCall = mockFetch.mock.calls.find((c: any[]) => c[0].includes('push-event'));
-      const body = JSON.parse(pushCall![1].body);
-      expect(body.event.data.uiMessages).toEqual(uiMessages);
-    });
-
-    it('omits uiMessages from the gateway push payload when not provided', async () => {
-      await notifier.publishAgentRuntimeEnd({
-        finalState: { status: 'done' },
-        operationId: 'op-1',
-        reason: 'completed',
-        stepIndex: 4,
-      });
-      await new Promise((r) => setTimeout(r, 50));
-
-      const pushCall = mockFetch.mock.calls.find((c: any[]) => c[0].includes('push-event'));
-      const body = JSON.parse(pushCall![1].body);
-      expect(body.event.data).not.toHaveProperty('uiMessages');
     });
   });
 
@@ -369,12 +306,7 @@ describe('GatewayStreamNotifier', () => {
         () => new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10)),
       );
 
-      const result = await notifier.publishAgentRuntimeEnd({
-        finalState: {},
-        operationId: 'op-1',
-        reason: 'completed',
-        stepIndex: 0,
-      });
+      const result = await notifier.publishAgentRuntimeEnd('op-1', 0, {}, 'completed');
 
       expect(result).toBe('publishAgentRuntimeEnd-result');
       expect(inner.calls.publishAgentRuntimeEnd).toHaveLength(1);

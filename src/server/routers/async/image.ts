@@ -4,10 +4,7 @@ import {
   buildMappedBusinessModelFields,
   resolveBusinessModelMapping,
 } from '@lobechat/business-model-runtime';
-import {
-  AgentRuntimeErrorType,
-  GOOGLE_IMAGE_TEXT_ONLY_RESPONSE_MESSAGE,
-} from '@lobechat/model-runtime';
+import { AgentRuntimeErrorType } from '@lobechat/model-runtime';
 import {
   AsyncTaskError,
   AsyncTaskErrorType,
@@ -37,16 +34,6 @@ import { getContentPolicyErrorMessage } from './contentPolicyError';
 const log = debug('lobe-image:async');
 
 const IMAGE_URL_PREVIEW_LENGTH = 100;
-const IMAGE_EDITING_NO_IMAGE_MESSAGE = [
-  'The provider did not return an image.',
-  'This may be due to content review.',
-  'Try a safer source image or a milder prompt.',
-].join(' ');
-const IMAGE_GENERATION_NO_IMAGE_MESSAGE = [
-  'The provider did not return an image.',
-  'This may be due to content review.',
-  'Try a milder prompt or another model.',
-].join(' ');
 
 const imageProcedure = asyncAuthedProcedure.use(async (opts) => {
   const { ctx } = opts;
@@ -164,30 +151,11 @@ const categorizeError = (
     };
   }
 
-  if (providerContentPolicyMessage) {
-    return {
-      errorMessage: providerContentPolicyMessage,
-      errorType: AsyncTaskErrorType.ProviderContentModeration,
-    };
-  }
-
   if (error.errorType === AgentRuntimeErrorType.ProviderNoImageGenerated) {
-    const providerErrorMessage = error.error?.message || error.message;
-
-    if (
-      typeof providerErrorMessage === 'string' &&
-      providerErrorMessage.includes(GOOGLE_IMAGE_TEXT_ONLY_RESPONSE_MESSAGE)
-    ) {
-      return {
-        errorMessage: providerErrorMessage,
-        errorType: AsyncTaskErrorType.ServerError,
-      };
-    }
-
     return {
       errorMessage: isEditingImage
-        ? IMAGE_EDITING_NO_IMAGE_MESSAGE
-        : IMAGE_GENERATION_NO_IMAGE_MESSAGE,
+        ? 'Provider returned no image (maybe content review). Try a safer source image or milder prompt.'
+        : 'Provider returned no image (maybe content review). Try a milder prompt or another model.',
       errorType: AsyncTaskErrorType.ServerError,
     };
   }
@@ -198,6 +166,13 @@ const categorizeError = (
       errorMessage:
         error.error?.message || error.message || AgentRuntimeErrorType.InvalidProviderAPIKey,
       errorType: AsyncTaskErrorType.InvalidProviderAPIKey,
+    };
+  }
+
+  if (providerContentPolicyMessage) {
+    return {
+      errorMessage: providerContentPolicyMessage,
+      errorType: AsyncTaskErrorType.ProviderContentModeration,
     };
   }
 

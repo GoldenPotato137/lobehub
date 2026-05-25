@@ -55,6 +55,11 @@ export default {
   'home.uploadEntries.folder.title': 'Upload Folder',
   'home.uploadEntries.library.title': 'Create New Library',
   'home.uploadEntries.newPage.title': 'New Page',
+  'library.import.action': 'Import to workspace…',
+  'library.import.failed': 'Failed to import knowledge base.',
+  'library.import.success': 'Knowledge base imported to {{name}}.',
+  'library.import.tooltip':
+    'Fork this knowledge base into a workspace. Files are shared by reference; the original stays in your personal space.',
   'library.list.confirmRemoveLibrary':
     'You are about to delete this library. The files within it will not be deleted but moved to All Files. This action cannot be undone, so please proceed with caution.',
   'library.list.empty': 'Click <1>+</1> to create a new library',

@@ -1,8 +1,7 @@
 import { type LobeChatDatabase } from '@lobechat/database';
 import { type DocumentItem } from '@lobechat/database/schemas';
 import { documents, files } from '@lobechat/database/schemas';
-import { loadFile, UnsupportedFileTypeError } from '@lobechat/file-loaders';
-import { TRPCError } from '@trpc/server';
+import { loadFile } from '@lobechat/file-loaders';
 import debug from 'debug';
 import { and, eq } from 'drizzle-orm';
 import isEqual from 'fast-deep-equal';
@@ -30,18 +29,6 @@ import type {
 
 const log = debug('lobe-chat:service:document');
 
-const normalizeParseFileError = (error: unknown) => {
-  if (error instanceof UnsupportedFileTypeError) {
-    return new TRPCError({
-      cause: error,
-      code: 'BAD_REQUEST',
-      message: error.message,
-    });
-  }
-
-  return error;
-};
-
 export class DocumentService {
   userId: string;
   private fileModel: FileModel;
@@ -50,11 +37,14 @@ export class DocumentService {
   private fileServiceInstance?: FileService;
   private db: LobeChatDatabase;
 
-  constructor(db: LobeChatDatabase, userId: string) {
+  private workspaceId?: string;
+
+  constructor(db: LobeChatDatabase, userId: string, workspaceId?: string) {
     this.userId = userId;
     this.db = db;
-    this.fileModel = new FileModel(db, userId);
-    this.documentModel = new DocumentModel(db, userId);
+    this.workspaceId = workspaceId;
+    this.fileModel = new FileModel(db, userId, workspaceId);
+    this.documentModel = new DocumentModel(db, userId, workspaceId);
   }
 
   private get fileService() {
@@ -64,7 +54,11 @@ export class DocumentService {
   }
 
   private get documentHistoryService() {
-    this.documentHistoryServiceInstance ??= new DocumentHistoryService(this.db, this.userId);
+    this.documentHistoryServiceInstance ??= new DocumentHistoryService(
+      this.db,
+      this.userId,
+      this.workspaceId,
+    );
 
     return this.documentHistoryServiceInstance;
   }
@@ -316,9 +310,13 @@ export class DocumentService {
   async updateDocument(id: string, params: UpdateDocumentParams): Promise<UpdateDocumentResult> {
     return this.db.transaction(async (tx) => {
       const transactionDb = tx as unknown as LobeChatDatabase;
-      const documentModel = new DocumentModel(transactionDb, this.userId);
-      const fileModel = new FileModel(transactionDb, this.userId);
-      const documentHistoryService = new DocumentHistoryService(transactionDb, this.userId);
+      const documentModel = new DocumentModel(transactionDb, this.userId, this.workspaceId);
+      const fileModel = new FileModel(transactionDb, this.userId, this.workspaceId);
+      const documentHistoryService = new DocumentHistoryService(
+        transactionDb,
+        this.userId,
+        this.workspaceId,
+      );
 
       const currentDocument = await documentModel.findById(id);
       if (!currentDocument) {
@@ -446,9 +444,8 @@ export class DocumentService {
 
       return document as LobeDocument;
     } catch (error) {
-      const parseError = normalizeParseFileError(error);
-      console.error(`${logPrefix} File parsing failed:`, parseError);
-      throw parseError;
+      console.error(`${logPrefix} File parsing failed:`, error);
+      throw error;
     } finally {
       cleanup();
     }
@@ -500,9 +497,8 @@ export class DocumentService {
 
       return document as LobeDocument;
     } catch (error) {
-      const parseError = normalizeParseFileError(error);
-      console.error(`${logPrefix} File parsing failed:`, parseError);
-      throw parseError;
+      console.error(`${logPrefix} File parsing failed:`, error);
+      throw error;
     } finally {
       cleanup();
     }

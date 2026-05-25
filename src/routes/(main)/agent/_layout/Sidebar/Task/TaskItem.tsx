@@ -4,8 +4,8 @@ import { Text } from '@lobehub/ui';
 import { cssVar } from 'antd-style';
 import { memo, useCallback } from 'react';
 
-import { useNavigateToTaskDetail } from '@/features/AgentTasks/shared/taskDetailPath';
 import NavItem from '@/features/NavPanel/components/NavItem';
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
 import type { TaskGroupItem } from '@/store/task/slices/list/initialState';
 
 type TaskRow = TaskGroupItem['tasks'][number];
@@ -16,11 +16,11 @@ interface TaskItemProps {
 }
 
 const TaskItem = memo<TaskItemProps>(({ task, active }) => {
-  const navigateToTaskDetail = useNavigateToTaskDetail();
+  const navigate = useWorkspaceAwareNavigate();
 
   const handleClick = useCallback(() => {
-    navigateToTaskDetail(task.identifier);
-  }, [navigateToTaskDetail, task.identifier]);
+    navigate(`/task/${task.identifier}`);
+  }, [navigate, task.identifier]);
 
   const hasName = Boolean(task.name?.trim());
   const displayTitle = hasName ? task.name : task.identifier;

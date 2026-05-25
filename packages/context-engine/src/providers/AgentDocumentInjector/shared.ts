@@ -1,5 +1,3 @@
-import type { AgentDocumentPolicyLoad } from '@lobechat/types';
-
 import type {
   AgentDocumentLoadRule,
   AgentDocumentLoadRules,
@@ -7,7 +5,6 @@ import type {
 import { matchesLoadRules } from '../../../../database/src/models/agentDocuments';
 
 export type { AgentDocumentLoadRule, AgentDocumentLoadRules };
-export type { AgentDocumentPolicyLoad };
 
 export const AGENT_DOCUMENT_INJECTION_POSITIONS = [
   'after-first-user',
@@ -34,7 +31,7 @@ export interface AgentContextDocument {
   loadPosition?: AgentDocumentInjectionPosition;
   loadRules?: AgentDocumentLoadRules;
   policyId?: string | null;
-  policyLoad?: AgentDocumentPolicyLoad;
+  policyLoad?: 'always' | 'progressive';
   policyLoadFormat?: AgentDocumentLoadFormat;
   sourceType?: AgentDocumentSourceType;
   title?: string;
@@ -82,9 +79,8 @@ export function getDocumentsForPositions(
   context: AgentDocumentFilterContext,
 ): AgentContextDocument[] {
   const positionSet = new Set(positions);
-  const docs = allDocuments.filter(
-    (doc) =>
-      doc.policyLoad !== 'disabled' && positionSet.has(doc.loadPosition || 'before-first-user'),
+  const docs = allDocuments.filter((doc) =>
+    positionSet.has(doc.loadPosition || 'before-first-user'),
   );
   const filtered = filterDocumentsByRules(docs, context);
   return sortByPriority(filtered);
@@ -226,15 +222,8 @@ export function combineDocuments(
   docs: AgentContextDocument[],
   context: AgentDocumentFilterContext,
 ): string {
-  // Missing `policyLoad` defaults to progressive (matches the DB default and
-  // `AgentDocumentModel.createWithTx`'s fallback). A doc must be explicitly
-  // marked `'always'` to land in the inline bucket; everything else that
-  // survived `getDocumentsForPositions` (which already drops `'disabled'`)
-  // is routed through the progressive index. Doing the default here means
-  // hand-rolled `AgentContextDocument` callers can't silently lose their
-  // content by forgetting the field.
-  const fullDocs = docs.filter((d) => d.policyLoad === 'always');
-  const progressiveDocs = docs.filter((d) => (d.policyLoad ?? 'progressive') === 'progressive');
+  const fullDocs = docs.filter((d) => d.policyLoad !== 'progressive');
+  const progressiveDocs = docs.filter((d) => d.policyLoad === 'progressive');
 
   const parts: string[] = [];
 

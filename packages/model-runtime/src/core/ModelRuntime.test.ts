@@ -697,41 +697,6 @@ describe('ModelRuntime', () => {
         expect(callOrder).toEqual(['existing', 'hook']);
       });
 
-      it('onGenerateObjectFinal receives synthetic speed metrics', async () => {
-        const nowSpy = vi
-          .spyOn(Date, 'now')
-          .mockReturnValueOnce(1000)
-          .mockReturnValueOnce(2000)
-          .mockReturnValueOnce(2500);
-        const onGenerateObjectFinal = vi.fn();
-        const { runtime, mockRuntimeAI } = createMockRuntime({ onGenerateObjectFinal });
-        const usage = { totalInputTokens: 100, totalOutputTokens: 20, totalTokens: 120 };
-
-        mockRuntimeAI.generateObject.mockImplementation(async (_p: any, opts: any) => {
-          await opts?.onUsage?.(usage);
-          return { result: 'ok' };
-        });
-
-        try {
-          await runtime.generateObject(genObjPayload);
-
-          expect(onGenerateObjectFinal).toHaveBeenCalledWith(
-            {
-              speed: {
-                duration: 500,
-                latency: 500,
-                tps: 40,
-                ttft: 0,
-              },
-              usage,
-            },
-            { options: undefined, payload: genObjPayload },
-          );
-        } finally {
-          nowSpy.mockRestore();
-        }
-      });
-
       it('onGenerateObjectError is called when generateObject throws, error is re-thrown', async () => {
         const genError = { errorType: 'ProviderBizError', error: new Error('fail') };
         const onGenerateObjectError = vi.fn();
@@ -750,46 +715,6 @@ describe('ModelRuntime', () => {
         mockRuntimeAI.generateObject.mockResolvedValue({ result: 'ok' });
 
         await expect(runtime.generateObject(genObjPayload)).resolves.toEqual({ result: 'ok' });
-      });
-
-      it('onGenerateObjectComplete fires on success with output, latency and usage', async () => {
-        const onGenerateObjectComplete = vi.fn();
-        const { runtime, mockRuntimeAI } = createMockRuntime({ onGenerateObjectComplete });
-        const usage = { totalInputTokens: 50, totalOutputTokens: 20, cost: 0.001 };
-        mockRuntimeAI.generateObject.mockImplementation(async (_p: any, opts: any) => {
-          await opts?.onUsage?.(usage);
-          return { result: 'ok' };
-        });
-
-        await runtime.generateObject(genObjPayload);
-
-        expect(onGenerateObjectComplete).toHaveBeenCalledTimes(1);
-        const [data, context] = onGenerateObjectComplete.mock.calls[0];
-        expect(data).toMatchObject({ output: { result: 'ok' }, success: true, usage });
-        expect(data.latencyMs).toBeGreaterThanOrEqual(0);
-        expect(context.payload).toBe(genObjPayload);
-      });
-
-      it('onGenerateObjectComplete fires on failure with structured error and is awaited before throw', async () => {
-        const onGenerateObjectComplete = vi.fn();
-        const { runtime, mockRuntimeAI } = createMockRuntime({ onGenerateObjectComplete });
-        const cause = new Error('boom');
-        mockRuntimeAI.generateObject.mockRejectedValue(cause);
-
-        await expect(runtime.generateObject(genObjPayload)).rejects.toBe(cause);
-        expect(onGenerateObjectComplete).toHaveBeenCalledTimes(1);
-        const [data] = onGenerateObjectComplete.mock.calls[0];
-        expect(data.success).toBe(false);
-        expect(data.error?.message).toBe('boom');
-      });
-
-      it('hook errors thrown from onGenerateObjectComplete are swallowed and do not surface', async () => {
-        const onGenerateObjectComplete = vi.fn().mockRejectedValue(new Error('hook broke'));
-        const { runtime, mockRuntimeAI } = createMockRuntime({ onGenerateObjectComplete });
-        mockRuntimeAI.generateObject.mockResolvedValue({ result: 'ok' });
-
-        await expect(runtime.generateObject(genObjPayload)).resolves.toEqual({ result: 'ok' });
-        expect(onGenerateObjectComplete).toHaveBeenCalledTimes(1);
       });
     });
 

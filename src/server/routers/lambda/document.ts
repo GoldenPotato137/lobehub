@@ -1,11 +1,13 @@
 import { z } from 'zod';
 
+import { withScopedPermission } from '@/business/server/trpc-middlewares/rbacPermission';
+import { wsCompatProcedure } from '@/business/server/trpc-middlewares/workspaceAuth';
 import { FREE_DOCUMENT_HISTORY_WINDOW_DAYS } from '@/const/documentHistory';
 import { ChunkModel } from '@/database/models/chunk';
 import { DocumentModel } from '@/database/models/document';
 import { FileModel } from '@/database/models/file';
 import { MessageModel } from '@/database/models/message';
-import { authedProcedure, router } from '@/libs/trpc/lambda';
+import { router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { DocumentService } from '@/server/services/document';
 
@@ -23,22 +25,24 @@ const getFreeDocumentHistorySince = () => {
   return new Date(now - FREE_DOCUMENT_HISTORY_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 };
 
-const documentProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
+const documentProcedure = wsCompatProcedure.use(serverDatabase).use(async (opts) => {
   const { ctx } = opts;
+  const wsId = ctx.workspaceId ?? undefined;
 
   return opts.next({
     ctx: {
       chunkModel: new ChunkModel(ctx.serverDB, ctx.userId),
-      documentModel: new DocumentModel(ctx.serverDB, ctx.userId),
-      documentService: new DocumentService(ctx.serverDB, ctx.userId),
-      fileModel: new FileModel(ctx.serverDB, ctx.userId),
-      messageModel: new MessageModel(ctx.serverDB, ctx.userId),
+      documentModel: new DocumentModel(ctx.serverDB, ctx.userId, wsId),
+      documentService: new DocumentService(ctx.serverDB, ctx.userId, wsId),
+      fileModel: new FileModel(ctx.serverDB, ctx.userId, wsId),
+      messageModel: new MessageModel(ctx.serverDB, ctx.userId, wsId),
     },
   });
 });
 
 export const documentRouter = router({
   createDocument: documentProcedure
+    .use(withScopedPermission('document:create'))
     .input(
       z.object({
         content: z.string().optional(),
@@ -71,6 +75,7 @@ export const documentRouter = router({
     }),
 
   createDocuments: documentProcedure
+    .use(withScopedPermission('document:create'))
     .input(
       z.object({
         documents: z.array(
@@ -115,12 +120,14 @@ export const documentRouter = router({
     }),
 
   deleteDocument: documentProcedure
+    .use(withScopedPermission('document:delete'))
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       return ctx.documentService.deleteDocument(input.id);
     }),
 
   deleteDocuments: documentProcedure
+    .use(withScopedPermission('document:delete'))
     .input(z.object({ ids: z.array(z.string()) }))
     .mutation(async ({ ctx, input }) => {
       return ctx.documentService.deleteDocuments(input.ids);
@@ -163,6 +170,7 @@ export const documentRouter = router({
     }),
 
   saveDocumentHistory: documentProcedure
+    .use(withScopedPermission('document:update'))
     .input(saveDocumentHistoryInputSchema)
     .mutation(async ({ ctx, input }) => {
       const editorData = JSON.parse(input.editorData);
@@ -199,6 +207,7 @@ export const documentRouter = router({
     }),
 
   parseDocument: documentProcedure
+    .use(withScopedPermission('document:update'))
     .input(
       z.object({
         id: z.string(),
@@ -211,6 +220,7 @@ export const documentRouter = router({
     }),
 
   parseFileContent: documentProcedure
+    .use(withScopedPermission('document:update'))
     .input(
       z.object({
         id: z.string(),
@@ -239,6 +249,7 @@ export const documentRouter = router({
     }),
 
   updateDocument: documentProcedure
+    .use(withScopedPermission('document:update'))
     .input(updateDocumentInputSchema)
     .mutation(async ({ ctx, input }) => {
       const { id, editorData: editorDataString, ...params } = input;

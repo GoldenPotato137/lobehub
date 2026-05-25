@@ -2,19 +2,18 @@
 
 import { AGENT_ONBOARDING_ENABLED } from '@lobechat/business-const';
 import { isDesktop } from '@lobechat/const';
-import { MAX_ONBOARDING_STEPS } from '@lobechat/types';
-import { Center, Flexbox, Text } from '@lobehub/ui';
-import { Divider } from 'antd';
+import { Center, Flexbox, FluentEmoji, Text } from '@lobehub/ui';
+import { Divider, Popconfirm } from 'antd';
 import { cx, useTheme } from 'antd-style';
 import { type FC, type MouseEvent, type PropsWithChildren, useCallback } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 
 import { ProductLogo } from '@/components/Branding';
 import LangButton from '@/features/User/UserPanel/LangButton';
 import ThemeButton from '@/features/User/UserPanel/ThemeButton';
+import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
 import { useIsDark } from '@/hooks/useIsDark';
-import { useIsMobile } from '@/hooks/useIsMobile';
 import { useServerConfigStore } from '@/store/serverConfig';
 import { useUserStore } from '@/store/user';
 
@@ -22,12 +21,11 @@ import { styles } from './style';
 
 const OnBoardingContainer: FC<PropsWithChildren> = ({ children }) => {
   const isDarkMode = useIsDark();
-  const isMobile = useIsMobile();
   const theme = useTheme();
-  const { t } = useTranslation('onboarding');
+  const { t } = useTranslation(['onboarding', 'common']);
   const { pathname } = useLocation();
-  const navigate = useNavigate();
-  const setOnboardingStep = useUserStore((s) => s.setOnboardingStep);
+  const navigate = useWorkspaceAwareNavigate();
+  const finishOnboarding = useUserStore((s) => s.finishOnboarding);
   const enableAgentOnboarding = useServerConfigStore((s) => s.featureFlags.enableAgentOnboarding);
   const serverConfigInit = useServerConfigStore((s) => s.serverConfigInit);
   const isAgentOnboarding = pathname.startsWith('/onboarding/agent');
@@ -40,10 +38,10 @@ const OnBoardingContainer: FC<PropsWithChildren> = ({ children }) => {
     !!enableAgentOnboarding &&
     isBranchOnboarding;
 
-  const handleSkip = useCallback(() => {
-    void setOnboardingStep(MAX_ONBOARDING_STEPS);
-    navigate('/onboarding/classic?entry=skip');
-  }, [navigate, setOnboardingStep]);
+  const handleConfirmSkip = useCallback(() => {
+    finishOnboarding();
+    navigate('/');
+  }, [finishOnboarding, navigate]);
 
   const switchMode = useCallback(
     (e: MouseEvent) => {
@@ -55,29 +53,18 @@ const OnBoardingContainer: FC<PropsWithChildren> = ({ children }) => {
   );
 
   return (
-    <Flexbox
-      className={styles.outerContainer}
-      height={'100%'}
-      padding={isMobile ? 0 : 8}
-      width={'100%'}
-    >
+    <Flexbox className={styles.outerContainer} height={'100%'} padding={8} width={'100%'}>
       <Flexbox
+        className={cx(isDarkMode ? styles.innerContainerDark : styles.innerContainerLight)}
         height={'100%'}
         width={'100%'}
-        className={cx(
-          isMobile
-            ? styles.innerContainerMobile
-            : isDarkMode
-              ? styles.innerContainerDark
-              : styles.innerContainerLight,
-        )}
       >
         <Flexbox
           horizontal
           align={'center'}
           gap={8}
           justify={'space-between'}
-          padding={isMobile ? 12 : 16}
+          padding={16}
           width={'100%'}
         >
           <ProductLogo color={theme.colorText} size={28} type={'text'} />
@@ -93,9 +80,10 @@ const OnBoardingContainer: FC<PropsWithChildren> = ({ children }) => {
           {children}
         </Center>
         {showModeSwitchAndSkipFooter && (
-          <Center paddingBlock={isMobile ? '0 12px' : '0 8px'} paddingInline={16}>
-            <Text fontSize={12} style={{ textAlign: 'center' }} type={'secondary'}>
+          <Center paddingBlock={'0 8px'} paddingInline={16}>
+            <Text fontSize={12} type={'secondary'}>
               <Trans
+                i18nKey={'agent.layout.switchMessage'}
                 ns={'onboarding'}
                 components={{
                   modeLink: (
@@ -105,14 +93,36 @@ const OnBoardingContainer: FC<PropsWithChildren> = ({ children }) => {
                     />
                   ),
                   modeText: <Text as={'span'} />,
-                  skipLink: <Text as={'span'} style={{ cursor: 'pointer' }} onClick={handleSkip} />,
+                  skipLink: (
+                    <Popconfirm
+                      arrow={false}
+                      cancelButtonProps={{ type: 'text' }}
+                      cancelText={t('cancel', { ns: 'common' })}
+                      okText={t('agent.layout.skipConfirm.ok', { ns: 'onboarding' })}
+                      style={{ cursor: 'pointer' }}
+                      description={
+                        <Text fontSize={13} style={{ marginBottom: 8 }} type={'secondary'}>
+                          {t('agent.layout.skipConfirm.content', { ns: 'onboarding' })}
+                        </Text>
+                      }
+                      icon={
+                        <FluentEmoji
+                          emoji={'😗'}
+                          size={24}
+                          style={{ marginRight: 8 }}
+                          type={'anim'}
+                        />
+                      }
+                      title={
+                        <Text fontSize={15}>
+                          {t('agent.completionTitle', { ns: 'onboarding' })}
+                        </Text>
+                      }
+                      onConfirm={handleConfirmSkip}
+                    />
+                  ),
                   skipText: <Text as={'span'} style={{ cursor: 'pointer' }} />,
                 }}
-                i18nKey={
-                  isAgentOnboarding
-                    ? 'agent.layout.switchMessage'
-                    : 'agent.layout.switchMessageClassic'
-                }
                 values={{
                   mode: isAgentOnboarding
                     ? t('agent.layout.mode.classic')

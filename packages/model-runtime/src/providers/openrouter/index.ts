@@ -51,11 +51,9 @@ export const params = {
       const modalities =
         (payload as any).modalities ?? (isImageModel ? ['image', 'text'] : undefined);
 
-      // Map imageResolution to image_size: '512' → '0.5K', others pass through.
-      // OpenRouter's image_size field expects '0.5K' for 512px output; the rest
-      // ('1K'/'2K'/'4K') are passed through verbatim.
+      // Map imageResolution to image_size: '512px' → '0.5K', others pass through
       const imageSizeValue = imageResolution
-        ? imageResolution === '512'
+        ? imageResolution === '512px'
           ? '0.5K'
           : imageResolution
         : undefined;

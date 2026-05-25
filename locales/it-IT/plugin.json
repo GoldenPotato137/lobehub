@@ -97,7 +97,7 @@
   "builtins.lobe-claude-code.task.updateDeleted": "Eliminato",
   "builtins.lobe-claude-code.task.updateInProgress": "Avviato",
   "builtins.lobe-claude-code.task.updateLabel": "Aggiornamento attività #{{taskId}}",
-  "builtins.lobe-claude-code.task.updatePending": "Reimposta",
+  "builtins.lobe-claude-code.task.updatePending": "Ripristina",
   "builtins.lobe-claude-code.todoWrite.allDone": "Tutte le attività completate",
   "builtins.lobe-claude-code.todoWrite.currentStep": "Passaggio attuale",
   "builtins.lobe-claude-code.todoWrite.todos": "Attività",
