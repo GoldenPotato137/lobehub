@@ -1310,6 +1310,10 @@ When I am ___, I need ___
   'workspace.billingPage.usage.activity.viewAllTitle': 'All recent activity',
   'workspace.billingPage.usage.at': 'When',
   'workspace.billingPage.usage.byMemberTitle': 'Spend by member',
+  'workspace.billingPage.usage.creditUsage.desc':
+    'Credits usage for AI chat, image generation, speech synthesis',
+  'workspace.billingPage.usage.creditUsage.resetDesc': 'Quota resets in {{time}}',
+  'workspace.billingPage.usage.creditUsage.title': 'Computing Credits Usage',
   'workspace.billingPage.usage.byModelTitle': 'Spend by model',
   'workspace.billingPage.usage.byTypeTitle': 'Spend by category',
   'workspace.billingPage.usage.categories.chat': 'Chat',
