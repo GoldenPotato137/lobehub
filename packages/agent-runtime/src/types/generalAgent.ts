@@ -72,6 +72,7 @@ export interface GeneralAgentConfig {
     [key: string]: any;
     maxSteps?: number;
   };
+  autoApproveSandboxExecution?: boolean;
   /**
    * Context compression configuration
    * When enabled and triggered, ALL messages are compressed into a single MessageGroup summary.

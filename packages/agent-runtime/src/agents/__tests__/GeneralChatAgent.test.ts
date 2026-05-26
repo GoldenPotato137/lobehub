@@ -2141,6 +2141,157 @@ describe('GeneralChatAgent', () => {
       ]);
     });
 
+    it('should auto-approve cloud sandbox execution when configured', async () => {
+      const agent = new GeneralChatAgent({
+        agentConfig: { maxSteps: 100 },
+        autoApproveSandboxExecution: true,
+        operationId: 'test-session',
+        modelRuntimeConfig: mockModelRuntimeConfig,
+      });
+
+      const toolCall: ChatToolPayload = {
+        id: 'call-1',
+        identifier: 'lobe-cloud-sandbox',
+        apiName: 'runCommand',
+        arguments: '{"command":"python --version"}',
+        type: 'builtin',
+      };
+
+      const state = createMockState({
+        toolManifestMap: {
+          'lobe-cloud-sandbox': {
+            api: [
+              {
+                humanIntervention: 'required',
+                name: 'runCommand',
+              },
+            ],
+            identifier: 'lobe-cloud-sandbox',
+          },
+        },
+        userInterventionConfig: {
+          approvalMode: 'manual',
+        },
+      });
+
+      const context = createMockContext('llm_result', {
+        hasToolsCalling: true,
+        toolsCalling: [toolCall],
+        parentMessageId: 'msg-1',
+      });
+
+      const result = await agent.runner(context, state);
+
+      expect(result).toEqual([
+        {
+          type: 'call_tool',
+          payload: {
+            parentMessageId: 'msg-1',
+            toolCalling: toolCall,
+          },
+        },
+      ]);
+    });
+
+    it('should keep non-sandbox command tools gated when sandbox auto-approval is configured', async () => {
+      const agent = new GeneralChatAgent({
+        agentConfig: { maxSteps: 100 },
+        autoApproveSandboxExecution: true,
+        operationId: 'test-session',
+        modelRuntimeConfig: mockModelRuntimeConfig,
+      });
+
+      const toolCall: ChatToolPayload = {
+        id: 'call-1',
+        identifier: 'lobe-local-system',
+        apiName: 'runCommand',
+        arguments: '{"command":"pwd"}',
+        type: 'builtin',
+      };
+
+      const state = createMockState({
+        toolManifestMap: {
+          'lobe-local-system': {
+            api: [
+              {
+                humanIntervention: 'required',
+                name: 'runCommand',
+              },
+            ],
+            identifier: 'lobe-local-system',
+          },
+        },
+        userInterventionConfig: {
+          approvalMode: 'manual',
+        },
+      });
+
+      const context = createMockContext('llm_result', {
+        hasToolsCalling: true,
+        toolsCalling: [toolCall],
+        parentMessageId: 'msg-1',
+      });
+
+      const result = await agent.runner(context, state);
+
+      expect(result).toEqual([
+        {
+          type: 'request_human_approve',
+          pendingToolsCalling: [toolCall],
+          reason: 'human_intervention_required',
+        },
+      ]);
+    });
+
+    it('should require approval for cloud sandbox execution by default', async () => {
+      const agent = new GeneralChatAgent({
+        agentConfig: { maxSteps: 100 },
+        operationId: 'test-session',
+        modelRuntimeConfig: mockModelRuntimeConfig,
+      });
+
+      const toolCall: ChatToolPayload = {
+        id: 'call-1',
+        identifier: 'lobe-cloud-sandbox',
+        apiName: 'executeCode',
+        arguments: '{"language":"python","code":"print(1)"}',
+        type: 'builtin',
+      };
+
+      const state = createMockState({
+        toolManifestMap: {
+          'lobe-cloud-sandbox': {
+            api: [
+              {
+                humanIntervention: 'required',
+                name: 'executeCode',
+              },
+            ],
+            identifier: 'lobe-cloud-sandbox',
+          },
+        },
+        userInterventionConfig: {
+          approvalMode: 'manual',
+        },
+      });
+
+      const context = createMockContext('llm_result', {
+        hasToolsCalling: true,
+        toolsCalling: [toolCall],
+        parentMessageId: 'msg-1',
+      });
+
+      const result = await agent.runner(context, state);
+
+      expect(result).toEqual([
+        {
+          type: 'request_human_approve',
+          pendingToolsCalling: [toolCall],
+          reason: 'human_intervention_required',
+        },
+      ]);
+    });
+
     it('should execute all tools when user approvalMode is auto-run', async () => {
       const agent = new GeneralChatAgent({
         agentConfig: { maxSteps: 100 },

@@ -26,6 +26,11 @@ import {
 } from '../types';
 import { shouldCompress } from '../utils/tokenCounter';
 
+const AUTO_APPROVABLE_SANDBOX_EXECUTION_TOOLS = new Set([
+  'lobe-cloud-sandbox/executeCode',
+  'lobe-cloud-sandbox/runCommand',
+]);
+
 /**
  * ChatAgent - The "Brain" of the chat agent
  *
@@ -145,6 +150,14 @@ export class GeneralChatAgent implements Agent {
     for (const toolCalling of toolsCalling) {
       const { identifier, apiName } = toolCalling;
       const toolKey = `${identifier}/${apiName}`;
+
+      if (
+        this.config.autoApproveSandboxExecution &&
+        AUTO_APPROVABLE_SANDBOX_EXECUTION_TOOLS.has(toolKey)
+      ) {
+        toolsToExecute.push(toolCalling);
+        continue;
+      }
 
       // Parse arguments for intervention checking
       let toolArgs: Record<string, any> = {};

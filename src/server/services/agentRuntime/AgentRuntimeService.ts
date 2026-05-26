@@ -1339,6 +1339,7 @@ export class AgentRuntimeService {
     // Create Agent instance — use custom factory if provided, otherwise default to GeneralChatAgent
     const generalConfig = {
       agentConfig: metadata?.agentConfig,
+      autoApproveSandboxExecution: process.env.LOBE_AUTO_APPROVE_SANDBOX_COMMANDS === 'true',
       compressionConfig: {
         enabled: metadata?.agentConfig?.chatConfig?.enableContextCompression ?? true,
         maxWindowToken: contextWindowTokens ?? undefined,
