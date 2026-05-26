@@ -1141,6 +1141,8 @@
   "workspace.billingPage.billing.autoRenewOn": "自動續訂開啟",
   "workspace.billingPage.billing.banner.cancelledDesc": "已安排取消。您的訂閱將在當前計費週期結束時停止續訂——工作區將回退到愛好者計劃。",
   "workspace.billingPage.billing.banner.cancelledTitle": "訂閱待取消",
+  "workspace.billingPage.billing.banner.expiredDesc": "您的訂閱已結束。重新訂閱以恢復專業功能，或降級至個人方案。",
+  "workspace.billingPage.billing.banner.expiredTitle": "訂閱已取消",
   "workspace.billingPage.billing.banner.inactiveDesc": "訂閱未啟用——點數將不會刷新，直到您重新訂閱。",
   "workspace.billingPage.billing.banner.inactiveTitle": "訂閱未啟用",
   "workspace.billingPage.billing.banner.resumeCta": "恢復",

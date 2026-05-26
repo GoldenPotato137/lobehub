@@ -1141,6 +1141,8 @@
   "workspace.billingPage.billing.autoRenewOn": "Automatische Verlängerung an",
   "workspace.billingPage.billing.banner.cancelledDesc": "Stornierung geplant. Ihr Abonnement wird am Ende des aktuellen Abrechnungszeitraums nicht mehr verlängert — der Workspace fällt dann auf Hobby zurück.",
   "workspace.billingPage.billing.banner.cancelledTitle": "Abonnement zur Kündigung vorgemerkt",
+  "workspace.billingPage.billing.banner.expiredDesc": "Ihr Abonnement ist abgelaufen. Abonnieren Sie erneut, um die Pro-Funktionen wiederherzustellen, oder wechseln Sie zu Solo.",
+  "workspace.billingPage.billing.banner.expiredTitle": "Abonnement gekündigt",
   "workspace.billingPage.billing.banner.inactiveDesc": "Abonnement ist inaktiv — Credits werden nicht aktualisiert, bis Sie erneut abonnieren.",
   "workspace.billingPage.billing.banner.inactiveTitle": "Abonnement inaktiv",
   "workspace.billingPage.billing.banner.resumeCta": "Fortsetzen",

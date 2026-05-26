@@ -1141,6 +1141,8 @@
   "workspace.billingPage.billing.autoRenewOn": "Automatisch verlengen ingeschakeld",
   "workspace.billingPage.billing.banner.cancelledDesc": "Annulering gepland. Je abonnement stopt met verlengen aan het einde van de huidige factureringscyclus — de werkruimte valt dan terug naar Hobby.",
   "workspace.billingPage.billing.banner.cancelledTitle": "Abonnement in afwachting van annulering",
+  "workspace.billingPage.billing.banner.expiredDesc": "Uw abonnement is verlopen. Neem opnieuw een abonnement om Pro-functies te herstellen, of downgrade naar Solo.",
+  "workspace.billingPage.billing.banner.expiredTitle": "Abonnement geannuleerd",
   "workspace.billingPage.billing.banner.inactiveDesc": "Abonnement is inactief — credits worden niet vernieuwd totdat je opnieuw abonneert.",
   "workspace.billingPage.billing.banner.inactiveTitle": "Abonnement inactief",
   "workspace.billingPage.billing.banner.resumeCta": "Hervatten",

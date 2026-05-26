@@ -1141,6 +1141,8 @@
   "workspace.billingPage.billing.autoRenewOn": "Автоматично подновяване включено",
   "workspace.billingPage.billing.banner.cancelledDesc": "Отмяната е планирана. Абонаментът ви спира да се подновява в края на текущия цикъл на фактуриране — след това работното пространство се връща към Хоби.",
   "workspace.billingPage.billing.banner.cancelledTitle": "Абонаментът е в процес на отмяна",
+  "workspace.billingPage.billing.banner.expiredDesc": "Вашият абонамент е изтекъл. Абонирайте се отново, за да възстановите Pro функциите, или преминете към Solo.",
+  "workspace.billingPage.billing.banner.expiredTitle": "Абонаментът е анулиран",
   "workspace.billingPage.billing.banner.inactiveDesc": "Абонаментът е неактивен — кредитите няма да се обновяват, докато не се абонирате отново.",
   "workspace.billingPage.billing.banner.inactiveTitle": "Абонаментът е неактивен",
   "workspace.billingPage.billing.banner.resumeCta": "Възобновяване",

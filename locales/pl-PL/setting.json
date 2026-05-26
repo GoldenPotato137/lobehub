@@ -1141,6 +1141,8 @@
   "workspace.billingPage.billing.autoRenewOn": "Automatyczne odnawianie włączone",
   "workspace.billingPage.billing.banner.cancelledDesc": "Anulowanie zaplanowane. Twoja subskrypcja przestanie się odnawiać na końcu bieżącego cyklu rozliczeniowego — przestrzeń robocza wróci wtedy do planu Hobby.",
   "workspace.billingPage.billing.banner.cancelledTitle": "Subskrypcja oczekuje na anulowanie",
+  "workspace.billingPage.billing.banner.expiredDesc": "Twoja subskrypcja wygasła. Odnów subskrypcję, aby przywrócić funkcje Pro, lub zmień plan na Solo.",
+  "workspace.billingPage.billing.banner.expiredTitle": "Subskrypcja anulowana",
   "workspace.billingPage.billing.banner.inactiveDesc": "Subskrypcja jest nieaktywna — kredyty nie będą się odnawiać, dopóki nie wznowisz subskrypcji.",
   "workspace.billingPage.billing.banner.inactiveTitle": "Subskrypcja nieaktywna",
   "workspace.billingPage.billing.banner.resumeCta": "Wznów",

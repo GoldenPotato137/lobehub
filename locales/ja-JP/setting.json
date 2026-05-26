@@ -1141,6 +1141,8 @@
   "workspace.billingPage.billing.autoRenewOn": "自動更新オン",
   "workspace.billingPage.billing.banner.cancelledDesc": "キャンセルが予定されています。現在の請求サイクル終了時にサブスクリプションの更新が停止し、その後ワークスペースはホビーに戻ります。",
   "workspace.billingPage.billing.banner.cancelledTitle": "サブスクリプションのキャンセルが保留中",
+  "workspace.billingPage.billing.banner.expiredDesc": "ご利用のサブスクリプションは終了しました。Pro機能を復元するには再購読するか、Soloプランにダウングレードしてください。",
+  "workspace.billingPage.billing.banner.expiredTitle": "サブスクリプションがキャンセルされました",
   "workspace.billingPage.billing.banner.inactiveDesc": "サブスクリプションが無効です — 再購読するまでクレジットは更新されません。",
   "workspace.billingPage.billing.banner.inactiveTitle": "サブスクリプションが無効",
   "workspace.billingPage.billing.banner.resumeCta": "再開",

@@ -1141,6 +1141,8 @@
   "workspace.billingPage.billing.autoRenewOn": "Renovação automática ativada",
   "workspace.billingPage.billing.banner.cancelledDesc": "Cancelamento agendado. Sua assinatura deixará de ser renovada no final do ciclo de faturamento atual — o espaço de trabalho então será revertido para Hobby.",
   "workspace.billingPage.billing.banner.cancelledTitle": "Assinatura pendente de cancelamento",
+  "workspace.billingPage.billing.banner.expiredDesc": "Sua assinatura foi encerrada. Reassine para restaurar os recursos Pro ou faça o downgrade para Solo.",
+  "workspace.billingPage.billing.banner.expiredTitle": "Assinatura cancelada",
   "workspace.billingPage.billing.banner.inactiveDesc": "A assinatura está inativa — os créditos não serão renovados até que você reative a assinatura.",
   "workspace.billingPage.billing.banner.inactiveTitle": "Assinatura inativa",
   "workspace.billingPage.billing.banner.resumeCta": "Retomar",

@@ -1141,6 +1141,8 @@
   "workspace.billingPage.billing.autoRenewOn": "Otomatik yenileme açık",
   "workspace.billingPage.billing.banner.cancelledDesc": "İptal planlandı. Aboneliğiniz mevcut fatura döneminin sonunda yenilenmeyi durduracak — ardından çalışma alanı Hobi'ye geri dönecek.",
   "workspace.billingPage.billing.banner.cancelledTitle": "Abonelik iptali bekleniyor",
+  "workspace.billingPage.billing.banner.expiredDesc": "Aboneliğiniz sona erdi. Pro özellikleri geri yüklemek için yeniden abone olun veya Solo'ya geçiş yapın.",
+  "workspace.billingPage.billing.banner.expiredTitle": "Abonelik iptal edildi",
   "workspace.billingPage.billing.banner.inactiveDesc": "Abonelik etkin değil — krediler yeniden abone olana kadar yenilenmeyecek.",
   "workspace.billingPage.billing.banner.inactiveTitle": "Abonelik etkin değil",
   "workspace.billingPage.billing.banner.resumeCta": "Devam et",

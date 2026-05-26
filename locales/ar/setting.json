@@ -1141,6 +1141,8 @@
   "workspace.billingPage.billing.autoRenewOn": "التجديد التلقائي مفعل",
   "workspace.billingPage.billing.banner.cancelledDesc": "تم جدولة الإلغاء. ستتوقف اشتراكك عن التجديد في نهاية دورة الفوترة الحالية — ستعود مساحة العمل إلى خطة الهواية.",
   "workspace.billingPage.billing.banner.cancelledTitle": "الاشتراك قيد الإلغاء",
+  "workspace.billingPage.billing.banner.expiredDesc": "انتهى اشتراكك. قم بإعادة الاشتراك لاستعادة ميزات Pro، أو قم بالتحويل إلى Solo.",
+  "workspace.billingPage.billing.banner.expiredTitle": "تم إلغاء الاشتراك",
   "workspace.billingPage.billing.banner.inactiveDesc": "الاشتراك غير نشط — لن يتم تحديث الأرصدة حتى تعيد الاشتراك.",
   "workspace.billingPage.billing.banner.inactiveTitle": "الاشتراك غير نشط",
   "workspace.billingPage.billing.banner.resumeCta": "استئناف",

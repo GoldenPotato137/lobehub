@@ -1141,6 +1141,8 @@
   "workspace.billingPage.billing.autoRenewOn": "Renovación automática activada",
   "workspace.billingPage.billing.banner.cancelledDesc": "Cancelación programada. Tu suscripción dejará de renovarse al final del ciclo de facturación actual — el espacio de trabajo volverá al plan Hobby.",
   "workspace.billingPage.billing.banner.cancelledTitle": "Suscripción pendiente de cancelación",
+  "workspace.billingPage.billing.banner.expiredDesc": "Tu suscripción ha finalizado. Vuelve a suscribirte para restaurar las funciones Pro o cambia a Solo.",
+  "workspace.billingPage.billing.banner.expiredTitle": "Suscripción cancelada",
   "workspace.billingPage.billing.banner.inactiveDesc": "La suscripción está inactiva — los créditos no se renovarán hasta que te vuelvas a suscribir.",
   "workspace.billingPage.billing.banner.inactiveTitle": "Suscripción inactiva",
   "workspace.billingPage.billing.banner.resumeCta": "Reanudar",

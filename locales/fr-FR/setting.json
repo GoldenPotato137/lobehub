@@ -1141,6 +1141,8 @@
   "workspace.billingPage.billing.autoRenewOn": "Renouvellement automatique activé",
   "workspace.billingPage.billing.banner.cancelledDesc": "Annulation programmée. Votre abonnement cesse de se renouveler à la fin du cycle de facturation actuel — l'espace de travail revient alors au plan Loisir.",
   "workspace.billingPage.billing.banner.cancelledTitle": "Abonnement en attente d'annulation",
+  "workspace.billingPage.billing.banner.expiredDesc": "Votre abonnement a pris fin. Réabonnez-vous pour restaurer les fonctionnalités Pro, ou passez à Solo.",
+  "workspace.billingPage.billing.banner.expiredTitle": "Abonnement annulé",
   "workspace.billingPage.billing.banner.inactiveDesc": "L'abonnement est inactif — les crédits ne seront pas renouvelés tant que vous ne vous réabonnerez pas.",
   "workspace.billingPage.billing.banner.inactiveTitle": "Abonnement inactif",
   "workspace.billingPage.billing.banner.resumeCta": "Reprendre",

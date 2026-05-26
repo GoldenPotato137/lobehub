@@ -1141,6 +1141,8 @@
   "workspace.billingPage.billing.autoRenewOn": "تجدید خودکار روشن",
   "workspace.billingPage.billing.banner.cancelledDesc": "لغو برنامه‌ریزی شده است. اشتراک شما در پایان دوره صورتحساب فعلی متوقف می‌شود — سپس فضای کاری به حالت تفریحی بازمی‌گردد.",
   "workspace.billingPage.billing.banner.cancelledTitle": "اشتراک در انتظار لغو",
+  "workspace.billingPage.billing.banner.expiredDesc": "اشتراک شما به پایان رسیده است. برای بازیابی ویژگی‌های حرفه‌ای دوباره اشتراک تهیه کنید یا به نسخه انفرادی کاهش دهید.",
+  "workspace.billingPage.billing.banner.expiredTitle": "اشتراک لغو شد",
   "workspace.billingPage.billing.banner.inactiveDesc": "اشتراک غیرفعال است — اعتبارات تا زمانی که دوباره مشترک شوید، تازه نمی‌شوند.",
   "workspace.billingPage.billing.banner.inactiveTitle": "اشتراک غیرفعال",
   "workspace.billingPage.billing.banner.resumeCta": "ادامه دهید",

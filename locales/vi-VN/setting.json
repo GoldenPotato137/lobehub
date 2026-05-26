@@ -1141,6 +1141,8 @@
   "workspace.billingPage.billing.autoRenewOn": "Tự động gia hạn bật",
   "workspace.billingPage.billing.banner.cancelledDesc": "Đã lên lịch hủy. Đăng ký của bạn sẽ ngừng gia hạn vào cuối chu kỳ thanh toán hiện tại — sau đó không gian làm việc sẽ trở về Hobby.",
   "workspace.billingPage.billing.banner.cancelledTitle": "Đăng ký đang chờ hủy",
+  "workspace.billingPage.billing.banner.expiredDesc": "Gói đăng ký của bạn đã hết hạn. Đăng ký lại để khôi phục các tính năng Pro, hoặc hạ cấp xuống gói Solo.",
+  "workspace.billingPage.billing.banner.expiredTitle": "Gói đăng ký đã bị hủy",
   "workspace.billingPage.billing.banner.inactiveDesc": "Đăng ký không hoạt động — tín dụng sẽ không được làm mới cho đến khi bạn đăng ký lại.",
   "workspace.billingPage.billing.banner.inactiveTitle": "Đăng ký không hoạt động",
   "workspace.billingPage.billing.banner.resumeCta": "Tiếp tục",

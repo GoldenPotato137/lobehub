@@ -1141,6 +1141,8 @@
   "workspace.billingPage.billing.autoRenewOn": "Автопродление включено",
   "workspace.billingPage.billing.banner.cancelledDesc": "Запланирована отмена. Ваша подписка перестанет продлеваться в конце текущего расчетного периода — рабочая область перейдет на план «Хобби».",
   "workspace.billingPage.billing.banner.cancelledTitle": "Подписка ожидает отмены",
+  "workspace.billingPage.billing.banner.expiredDesc": "Срок вашей подписки истёк. Оформите повторную подписку, чтобы восстановить функции Pro, или перейдите на тариф Solo.",
+  "workspace.billingPage.billing.banner.expiredTitle": "Подписка отменена",
   "workspace.billingPage.billing.banner.inactiveDesc": "Подписка неактивна — кредиты не будут обновляться, пока вы не возобновите подписку.",
   "workspace.billingPage.billing.banner.inactiveTitle": "Подписка неактивна",
   "workspace.billingPage.billing.banner.resumeCta": "Возобновить",

@@ -1097,6 +1097,9 @@ When I am ___, I need ___
   'workspace.billingPage.billing.banner.cancelledDesc':
     'Cancellation scheduled. Your subscription stops renewing at the end of the current billing cycle — the workspace then falls back to Hobby.',
   'workspace.billingPage.billing.banner.cancelledTitle': 'Subscription pending cancellation',
+  'workspace.billingPage.billing.banner.expiredDesc':
+    'Your subscription has ended. Re-subscribe to restore Pro features, or downgrade to Solo.',
+  'workspace.billingPage.billing.banner.expiredTitle': 'Subscription cancelled',
   'workspace.billingPage.billing.banner.inactiveDesc':
     'Subscription is inactive — credits will not refresh until you re-subscribe.',
   'workspace.billingPage.billing.banner.inactiveTitle': 'Subscription inactive',

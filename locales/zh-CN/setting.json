@@ -1141,6 +1141,8 @@
   "workspace.billingPage.billing.autoRenewOn": "自动续订开启",
   "workspace.billingPage.billing.banner.cancelledDesc": "已安排取消。您的订阅将在当前计费周期结束时停止续订——工作区将回退到基础版。",
   "workspace.billingPage.billing.banner.cancelledTitle": "订阅待取消",
+  "workspace.billingPage.billing.banner.expiredDesc": "您的订阅已结束。重新订阅以恢复 Pro 功能，或降级为 Solo。",
+  "workspace.billingPage.billing.banner.expiredTitle": "订阅已取消",
   "workspace.billingPage.billing.banner.inactiveDesc": "订阅已失效——在您重新订阅之前，额度将不会刷新。",
   "workspace.billingPage.billing.banner.inactiveTitle": "订阅失效",
   "workspace.billingPage.billing.banner.resumeCta": "恢复订阅",
