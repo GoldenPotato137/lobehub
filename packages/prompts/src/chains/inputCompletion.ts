@@ -87,19 +87,22 @@ export const chainInputCompletion = (
   // the system prompt (and thus the tracing `promptHash`) stays stable across
   // invocations. Otherwise every keystroke in a longer conversation produces a
   // distinct hash, defeating the per-prompt grouping.
-  const messages: OpenAIChatMessage[] = [{ content: SYSTEM_PROMPT, role: 'system' }];
+  const contextMessage: OpenAIChatMessage | null = context?.length
+    ? {
+        content: `Current conversation context:\n${context.map((m) => `${m.role}: ${m.content}`).join('\n')}`,
+        role: 'user',
+      }
+    : null;
 
-  if (context?.length) {
-    messages.push({
-      content: `Current conversation context:\n${context.map((m) => `${m.role}: ${m.content}`).join('\n')}`,
-      role: 'user',
-    });
-  }
-
-  messages.push({
-    content: `Before cursor: "${beforeCursor}"\nAfter cursor: "${afterCursor}"`,
-    role: 'user',
-  });
-
-  return { messages, schema: INPUT_COMPLETION_SCHEMA };
+  return {
+    messages: [
+      { content: SYSTEM_PROMPT, role: 'system' },
+      ...(contextMessage ? [contextMessage] : []),
+      {
+        content: `Before cursor: "${beforeCursor}"\nAfter cursor: "${afterCursor}"`,
+        role: 'user',
+      },
+    ],
+    schema: INPUT_COMPLETION_SCHEMA,
+  };
 };
