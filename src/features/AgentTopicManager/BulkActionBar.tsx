@@ -22,8 +22,8 @@ const styles = createStaticStyles(({ css }) => ({
 
     background: ${cssVar.colorBgElevated};
     box-shadow:
-      0 12px 32px rgb(0 0 0 / 24%),
-      0 2px 6px rgb(0 0 0 / 16%);
+      0 4px 12px rgb(0 0 0 / 8%),
+      0 1px 3px rgb(0 0 0 / 6%);
   `,
   divider: css`
     width: 1px;
