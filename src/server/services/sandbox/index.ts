@@ -1,3 +1,5 @@
+import { Buffer } from 'node:buffer';
+
 import {
   type ISandboxService,
   type SandboxCallToolResult,
@@ -6,10 +8,14 @@ import {
 import { type CodeInterpreterToolName } from '@lobehub/market-sdk';
 import debug from 'debug';
 import { sha256 } from 'js-sha256';
+import mime from 'mime';
 
 import { FileS3 } from '@/server/modules/S3';
 import { type FileService } from '@/server/services/file';
 import { type MarketService } from '@/server/services/market';
+
+import { E2BSandboxProvider } from './e2b-provider';
+import { isE2BSandboxProviderEnabled } from './e2b-session-manager';
 
 const log = debug('lobe-server:sandbox-service');
 
@@ -45,10 +51,14 @@ export class ServerSandboxService implements ISandboxService {
   }
 
   /**
-   * Call a sandbox tool via MarketService
+   * Call a sandbox tool via MarketService or the configured local E2B provider.
    */
   async callTool(toolName: string, params: Record<string, any>): Promise<SandboxCallToolResult> {
     log('Calling sandbox tool: %s with params: %O, topicId: %s', toolName, params, this.topicId);
+
+    if (isE2BSandboxProviderEnabled()) {
+      return this.getE2BProvider().callTool(toolName, params);
+    }
 
     try {
       const response = await this.marketService
@@ -103,6 +113,10 @@ export class ServerSandboxService implements ISandboxService {
    */
   async exportAndUploadFile(path: string, filename: string): Promise<SandboxExportFileResult> {
     log('Exporting file: %s from path: %s, topicId: %s', filename, path, this.topicId);
+
+    if (isE2BSandboxProviderEnabled()) {
+      return this.exportAndUploadFileFromE2B(path, filename);
+    }
 
     try {
       const s3 = new FileS3();
@@ -182,5 +196,56 @@ export class ServerSandboxService implements ISandboxService {
         success: false,
       };
     }
+  }
+
+  private async exportAndUploadFileFromE2B(
+    path: string,
+    filename: string,
+  ): Promise<SandboxExportFileResult> {
+    try {
+      const s3 = new FileS3();
+      const today = new Date().toISOString().split('T')[0];
+      const key = `code-interpreter-exports/${today}/${this.topicId}/${filename}`;
+      const fileBytes = await this.getE2BProvider().readFileBytes(path);
+      const mimeType = mime.getType(filename) || 'application/octet-stream';
+
+      await s3.uploadBuffer(key, Buffer.from(fileBytes), mimeType);
+
+      const metadata = await s3.getFileMetadata(key);
+      const fileSize = metadata.contentLength;
+      const fileHash = sha256(key + Date.now().toString());
+
+      const { fileId, url } = await this.fileService.createFileRecord({
+        fileHash,
+        fileType: metadata.contentType || mimeType,
+        name: filename,
+        size: fileSize,
+        url: key,
+      });
+
+      return {
+        fileId,
+        filename,
+        mimeType: metadata.contentType || mimeType,
+        size: fileSize,
+        success: true,
+        url,
+      };
+    } catch (error) {
+      log('Error exporting file from E2B sandbox: %O', error);
+
+      return {
+        error: { message: (error as Error).message },
+        filename,
+        success: false,
+      };
+    }
+  }
+
+  private getE2BProvider() {
+    return new E2BSandboxProvider({
+      topicId: this.topicId,
+      userId: this.userId,
+    });
   }
 }

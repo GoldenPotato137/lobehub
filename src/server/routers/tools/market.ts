@@ -19,6 +19,8 @@ import {
   contentBlocksToString,
   processContentBlocks,
 } from '@/server/services/mcp/contentProcessor';
+import { ServerSandboxService } from '@/server/services/sandbox';
+import { isE2BSandboxProviderEnabled } from '@/server/services/sandbox/e2b-session-manager';
 
 import { scheduleToolCallReport } from './_helpers';
 
@@ -203,6 +205,15 @@ const execInSandboxHandler = async ({
         };
         log('Added skillZipUrls to execScript params: %O', Object.keys(skillZipUrls));
       }
+    }
+
+    if (isE2BSandboxProviderEnabled()) {
+      return new ServerSandboxService({
+        fileService: ctx.fileService,
+        marketService: ctx.marketService,
+        topicId,
+        userId,
+      }).callTool(toolName, enhancedParams);
     }
 
     const market = ctx.marketService.market;
@@ -646,6 +657,15 @@ export const marketRouter = router({
       log('Exporting and uploading file: %s from path: %s in topic: %s', filename, path, topicId);
 
       try {
+        if (isE2BSandboxProviderEnabled()) {
+          return new ServerSandboxService({
+            fileService: ctx.fileService,
+            marketService: ctx.marketService,
+            topicId,
+            userId: ctx.userId,
+          }).exportAndUploadFile(path, filename);
+        }
+
         const s3 = new FileS3();
 
         // Use date-based sharding for privacy compliance (GDPR, CCPA)
