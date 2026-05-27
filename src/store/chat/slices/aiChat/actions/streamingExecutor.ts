@@ -596,9 +596,13 @@ export class StreamingExecutorActionImpl {
       model,
       provider!,
     )(getAiInfraStoreState());
+    const serverConfigState = getServerConfigStoreState();
+    const autoApproveSandboxExecution =
+      !!serverConfigState && serverConfigSelectors.autoApproveSandboxExecution(serverConfigState);
 
     const agent = new GeneralChatAgent({
       agentConfig: { maxSteps: 1000 },
+      autoApproveSandboxExecution,
       compressionConfig: {
         enabled: agentConfigData.chatConfig?.enableContextCompression ?? true, // Default to enabled
         maxWindowToken: contextWindowTokens ?? undefined,

@@ -23,7 +23,10 @@ import {
 } from './fixtures';
 import { resetTestEnvironment, setupMockSelectors, spyOnMessageService } from './helpers';
 
-const serverConfigMock = vi.hoisted(() => ({ enableVisualUnderstanding: false }));
+const serverConfigMock = vi.hoisted(() => ({
+  autoApproveSandboxExecution: false,
+  enableVisualUnderstanding: false,
+}));
 const agentSignalBridgeMock = vi.hoisted(() => ({
   emitClientAgentSignalSourceEvent: vi.fn().mockResolvedValue(undefined),
 }));
@@ -45,6 +48,7 @@ vi.mock('@/utils/localStorage', () => {
 interface AgentRuntimeStepContext {
   agent: {
     config: {
+      autoApproveSandboxExecution?: boolean;
       compressionConfig: {
         enabled: boolean;
         maxWindowToken?: number;
@@ -53,9 +57,13 @@ interface AgentRuntimeStepContext {
   };
 }
 
-const getCreatedAgentCompressionConfig = (stepSpy: { mock: { contexts: unknown[] } }) => {
+const getCreatedAgentConfig = (stepSpy: { mock: { contexts: unknown[] } }) => {
   const runtime = stepSpy.mock.contexts[0] as AgentRuntimeStepContext;
-  return runtime.agent.config.compressionConfig;
+  return runtime.agent.config;
+};
+
+const getCreatedAgentCompressionConfig = (stepSpy: { mock: { contexts: unknown[] } }) => {
+  return getCreatedAgentConfig(stepSpy).compressionConfig;
 };
 
 const createMockRuntimeState = (operationId: string, status: AgentState['status']): AgentState => ({
@@ -94,9 +102,15 @@ vi.mock('@/store/chat/slices/aiChat/actions/agentSignalBridge', () => ({
 }));
 vi.mock('@/store/serverConfig', () => ({
   getServerConfigStoreState: () => ({
-    serverConfig: { enableVisualUnderstanding: serverConfigMock.enableVisualUnderstanding },
+    serverConfig: {
+      autoApproveSandboxExecution: serverConfigMock.autoApproveSandboxExecution,
+      enableVisualUnderstanding: serverConfigMock.enableVisualUnderstanding,
+    },
   }),
   serverConfigSelectors: {
+    autoApproveSandboxExecution: (state: {
+      serverConfig: { autoApproveSandboxExecution?: boolean };
+    }) => !!state.serverConfig.autoApproveSandboxExecution,
     enableVisualUnderstanding: (state: { serverConfig: { enableVisualUnderstanding?: boolean } }) =>
       !!state.serverConfig.enableVisualUnderstanding,
   },
@@ -117,6 +131,7 @@ beforeEach(() => {
   resetTestEnvironment();
   setupMockSelectors();
   spyOnMessageService();
+  serverConfigMock.autoApproveSandboxExecution = false;
   serverConfigMock.enableVisualUnderstanding = false;
 
   act(() => {
@@ -356,6 +371,49 @@ describe('StreamingExecutor actions', () => {
         enabled: true,
         maxWindowToken: 200_000,
       });
+
+      streamSpy.mockRestore();
+    });
+
+    it('should pass server sandbox auto-approval config into the agent', async () => {
+      act(() => {
+        useChatStore.setState({ executeClientAgent: realExecAgentRuntime });
+      });
+      serverConfigMock.autoApproveSandboxExecution = true;
+
+      vi.spyOn(agentConfigResolver, 'resolveAgentConfig').mockReturnValue({
+        agentConfig: createMockAgentConfig({ model: 'gpt-4o-mini', provider: 'openai' }),
+        chatConfig: createMockChatConfig(),
+        isBuiltinAgent: false,
+        plugins: [],
+      });
+
+      const stepSpy = vi.spyOn(agentRuntime.AgentRuntime.prototype, 'step');
+      const { result } = renderHook(() => useChatStore());
+      const userMessage = {
+        id: TEST_IDS.USER_MESSAGE_ID,
+        role: 'user',
+        content: TEST_CONTENT.USER_MESSAGE,
+        sessionId: TEST_IDS.SESSION_ID,
+        topicId: TEST_IDS.TOPIC_ID,
+      } as UIChatMessage;
+
+      const streamSpy = vi
+        .spyOn(chatService, 'createAssistantMessageStream')
+        .mockImplementation(async ({ onFinish }) => {
+          await onFinish?.(TEST_CONTENT.AI_RESPONSE, {} as any);
+        });
+
+      await act(async () => {
+        await result.current.executeClientAgent({
+          context: { agentId: TEST_IDS.SESSION_ID, topicId: TEST_IDS.TOPIC_ID },
+          messages: [userMessage],
+          parentMessageId: userMessage.id,
+          parentMessageType: 'user',
+        });
+      });
+
+      expect(getCreatedAgentConfig(stepSpy).autoApproveSandboxExecution).toBe(true);
 
       streamSpy.mockRestore();
     });

@@ -87,6 +87,7 @@ export const getServerGlobalConfig = async () => {
         withDeploymentName: true,
       },
     }),
+    autoApproveSandboxExecution: process.env.LOBE_AUTO_APPROVE_SANDBOX_COMMANDS === 'true',
     defaultAgent: {
       config: parseAgentConfig(DEFAULT_AGENT_CONFIG),
     },
