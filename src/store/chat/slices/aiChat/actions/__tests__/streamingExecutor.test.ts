@@ -187,6 +187,17 @@ describe('StreamingExecutor actions', () => {
       const operations = Object.values(result.current.operations);
       const execOperation = operations.find((op) => op.type === 'execAgentRuntime');
       expect(execOperation?.status).toBe('completed');
+      expect(agentSignalBridgeMock.emitClientAgentSignalSourceEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payload: expect.objectContaining({
+            parentMessageId: userMessage.id,
+            parentMessageType: 'user',
+            triggerMessageId: userMessage.id,
+          }),
+          sourceId: `${execOperation?.id}:client:start`,
+          sourceType: 'client.runtime.start',
+        }),
+      );
 
       streamSpy.mockRestore();
     });
@@ -1777,9 +1788,11 @@ describe('StreamingExecutor actions', () => {
       expect(agentSignalBridgeMock.emitClientAgentSignalSourceEvent).toHaveBeenCalledWith(
         expect.objectContaining({
           payload: expect.objectContaining({
+            anchorMessageId: TEST_IDS.ASSISTANT_MESSAGE_ID,
             assistantMessageId: TEST_IDS.ASSISTANT_MESSAGE_ID,
             operationId,
             status: 'completed',
+            triggerMessageId: TEST_IDS.USER_MESSAGE_ID,
           }),
           sourceId: `${operationId}:client:complete`,
           sourceType: 'client.runtime.complete',
@@ -1864,9 +1877,19 @@ describe('StreamingExecutor actions', () => {
       expect(agentSignalBridgeMock.emitClientAgentSignalSourceEvent).toHaveBeenCalledWith(
         expect.objectContaining({
           payload: expect.objectContaining({
+            anchorMessageId: TEST_IDS.ASSISTANT_MESSAGE_ID,
             assistantMessageId: TEST_IDS.ASSISTANT_MESSAGE_ID,
             operationId,
             status: 'completed',
+          }),
+          sourceId: `${operationId}:client:complete`,
+          sourceType: 'client.runtime.complete',
+        }),
+      );
+      expect(agentSignalBridgeMock.emitClientAgentSignalSourceEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payload: expect.not.objectContaining({
+            triggerMessageId: TEST_IDS.ASSISTANT_MESSAGE_ID,
           }),
           sourceId: `${operationId}:client:complete`,
           sourceType: 'client.runtime.complete',
@@ -2026,9 +2049,11 @@ describe('StreamingExecutor actions', () => {
       expect(agentSignalBridgeMock.emitClientAgentSignalSourceEvent).toHaveBeenCalledWith(
         expect.objectContaining({
           payload: expect.objectContaining({
+            anchorMessageId: 'assistant-final',
             assistantMessageId: 'assistant-final',
             operationId,
             status: 'completed',
+            triggerMessageId: TEST_IDS.USER_MESSAGE_ID,
           }),
           sourceId: `${operationId}:client:complete`,
           sourceType: 'client.runtime.complete',
