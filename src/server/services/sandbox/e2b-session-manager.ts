@@ -5,6 +5,27 @@ const DEFAULT_AGENT_SANDBOX_TIMEOUT_MS = 600_000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
 const DEFAULT_AGENT_SANDBOX_TEMPLATE = 'code-interpreter';
 
+/**
+ * Newer e2b SDK versions (>=2.25) validate that API keys match /^e2b_[0-9a-f]+$/.
+ * Agent-sandbox uses "sys-" prefixed keys which fail this check.
+ * Bypass by passing the key via the `headers` option instead of `apiKey`, and
+ * suppressing the SDK's env-based key resolution.
+ */
+let isApiKeyValidationBypassed = false;
+
+const bypassApiKeyValidation = () => {
+  if (isApiKeyValidationBypassed) return;
+
+  // Override the static `apiKey` getter on ConnectionConfig so the SDK
+  // doesn't pick up E2B_API_KEY from env and try to validate it.
+  Object.defineProperty(ConnectionConfig, 'apiKey', {
+    configurable: true,
+    get: () => undefined,
+  });
+
+  isApiKeyValidationBypassed = true;
+};
+
 export interface E2BSandboxConfig {
   apiKey?: string;
   apiUrl?: string;
@@ -159,10 +180,13 @@ export const getE2BSandboxConfig = (): E2BSandboxConfig => {
 
 export class E2BSandboxSessionManager {
   private readonly config: E2BSandboxConfig;
+  private readonly useHeaderAuth: boolean;
 
   constructor(config: E2BSandboxConfig = getE2BSandboxConfig()) {
     this.config = config;
+    this.useHeaderAuth = isAgentSandboxProvider(getSandboxProvider());
 
+    if (this.useHeaderAuth) bypassApiKeyValidation();
     if (this.config.routerMode === 'path') applyPathRouter();
   }
 
@@ -230,10 +254,14 @@ export class E2BSandboxSessionManager {
   private createSandboxOptions(topicId: string, userId: string): SandboxOpts {
     return {
       allowInternetAccess: true,
-      apiKey: this.config.apiKey,
+      // When using agent-sandbox, pass the API key via headers to bypass
+      // e2b SDK's key format validation (requires "e2b_" prefix in >=2.25).
+      apiKey: this.useHeaderAuth ? undefined : this.config.apiKey,
       apiUrl: this.config.apiUrl,
       debug: this.config.debug,
       domain: this.config.domain,
+      headers:
+        this.useHeaderAuth && this.config.apiKey ? { 'X-API-KEY': this.config.apiKey } : undefined,
       metadata: {
         topicId,
         userId,
