@@ -705,6 +705,71 @@ export const createRuntimeExecutors = (
         // {{sandbox_enabled}} — mirrors client-side check for lobe-cloud-sandbox.
         const sandboxEnabled = String(resolved.enabledToolIds.includes('lobe-cloud-sandbox'));
 
+        // Import attached files into the sandbox filesystem (async, non-blocking).
+        // Only runs on the first step to avoid redundant writes on subsequent agentic steps.
+        if (
+          sandboxEnabled === 'true' &&
+          state.stepCount === 0 &&
+          ctx.serverDB &&
+          ctx.userId &&
+          ctx.topicId
+        ) {
+          // Collect file IDs from the last user message's attachments
+          const lastUserMsg = [...(llmPayload.messages as any[])]
+            .reverse()
+            .find(
+              (m) =>
+                m?.role === 'user' &&
+                (m.imageList?.length || m.fileList?.length || m.videoList?.length),
+            );
+
+          if (lastUserMsg) {
+            const fileIds: string[] = [];
+            for (const item of lastUserMsg.imageList ?? []) {
+              if (item?.id) fileIds.push(item.id);
+            }
+            for (const item of lastUserMsg.fileList ?? []) {
+              if (item?.id) fileIds.push(item.id);
+            }
+            for (const item of lastUserMsg.videoList ?? []) {
+              if (item?.id) fileIds.push(item.id);
+            }
+
+            if (fileIds.length > 0) {
+              // Fire-and-forget: import files in background, don't block LLM call
+              void (async () => {
+                try {
+                  const { FileModel } = await import('@/database/models/file');
+                  const { ServerSandboxService } = await import('@/server/services/sandbox');
+                  const { MarketService } = await import('@/server/services/market');
+
+                  const fileModel = new FileModel(ctx.serverDB!, ctx.userId!);
+                  const fileRecords = await fileModel.findByIds([...new Set(fileIds)]);
+                  if (fileRecords.length === 0) return;
+
+                  const filesToImport = fileRecords
+                    .filter((f) => f.url)
+                    .map((f) => ({ name: f.name || `file_${f.id}`, s3Key: f.url }));
+
+                  const fileService = new FileService(ctx.serverDB!, ctx.userId!);
+                  const marketService = new MarketService({ userInfo: { userId: ctx.userId! } });
+                  const sandboxService = new ServerSandboxService({
+                    fileService,
+                    marketService,
+                    topicId: ctx.topicId!,
+                    userId: ctx.userId!,
+                  });
+
+                  await sandboxService.importFiles(filesToImport);
+                  log(`[${operationLogId}] imported %d file(s) into sandbox`, filesToImport.length);
+                } catch (error) {
+                  log(`[${operationLogId}] sandbox file import failed (non-fatal): %O`, error);
+                }
+              })();
+            }
+          }
+        }
+
         // {{session_date}} — current date formatted for user's timezone.
         const sessionDate = new Intl.DateTimeFormat('en-US', {
           day: 'numeric',

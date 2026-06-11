@@ -242,6 +242,41 @@ export class ServerSandboxService implements ISandboxService {
     }
   }
 
+  /**
+   * Import files from S3 into the sandbox filesystem at /home/user/uploads/.
+   * Best-effort: per-file errors are logged but never thrown.
+   */
+  async importFiles(files: Array<{ name: string; s3Key: string }>): Promise<void> {
+    if (files.length === 0) return;
+
+    const s3 = new FileS3();
+    const uploadDir = '/home/user/uploads';
+
+    for (const file of files) {
+      try {
+        const bytes = await s3.getFileByteArray(file.s3Key);
+        const filePath = `${uploadDir}/${file.name}`;
+
+        if (isE2BSandboxProviderEnabled()) {
+          await this.getE2BProvider().writeFileBytes(filePath, bytes);
+        } else {
+          // MarketService-based sandbox: write via callTool with base64 content
+          const base64Content = Buffer.from(bytes).toString('base64');
+          await this.callTool('writeFile', {
+            content: base64Content,
+            createDirectories: true,
+            encoding: 'base64',
+            path: filePath,
+          });
+        }
+
+        log('importFiles: wrote %s (%d bytes) to sandbox', filePath, bytes.byteLength);
+      } catch (error) {
+        log('importFiles: failed to import %s (key=%s): %O', file.name, file.s3Key, error);
+      }
+    }
+  }
+
   private getE2BProvider() {
     return new E2BSandboxProvider({
       topicId: this.topicId,

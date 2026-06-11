@@ -101,6 +101,18 @@ export class E2BSandboxProvider {
     return sandbox.files.read(path, { format: 'bytes' });
   }
 
+  async writeFileBytes(path: string, bytes: Uint8Array): Promise<void> {
+    const sandbox = await this.getSandbox();
+    const parentDir = dirname(path);
+    if (parentDir && parentDir !== '.' && parentDir !== '/') {
+      await sandbox.files.makeDir(parentDir).catch(() => undefined);
+    }
+    // e2b SDK write() accepts ArrayBuffer; use Uint8Array.prototype.slice() which
+    // always returns a new Uint8Array backed by a fresh ArrayBuffer (not SharedArrayBuffer).
+    const buf = bytes.slice().buffer as ArrayBuffer;
+    await sandbox.files.write(path, buf);
+  }
+
   private async getSandbox() {
     return this.sessionManager.getSandbox(this.topicId, this.userId);
   }

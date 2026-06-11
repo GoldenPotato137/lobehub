@@ -45,4 +45,11 @@ export interface ISandboxService {
    * @param filename - The name of the file to export
    */
   exportAndUploadFile: (path: string, filename: string) => Promise<SandboxExportFileResult>;
+
+  /**
+   * Import files from cloud storage into the sandbox filesystem.
+   * Best-effort: per-file errors are logged but never thrown.
+   * @param files - Array of files to import (S3 key + desired filename)
+   */
+  importFiles?: (files: Array<{ name: string; s3Key: string }>) => Promise<void>;
 }
