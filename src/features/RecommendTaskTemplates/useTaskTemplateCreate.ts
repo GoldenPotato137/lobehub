@@ -62,7 +62,9 @@ export const useTaskTemplateCreate = ({
   const createTask = useTaskStore((s) => s.createTask);
   const navigate = useWorkspaceAwareNavigate();
   const requiredConnectors = useMemo(
-    () => template.connectors.filter((connector) => connector.required),
+    // Defensive: older backends (pre-v2.2.7) returned templates without a
+    // `connectors` field. Guard against undefined to avoid crashing.
+    () => (template.connectors ?? []).filter((connector) => connector.required),
     [template.connectors],
   );
   const requiredConnection = useConnectorConnection(requiredConnectors);

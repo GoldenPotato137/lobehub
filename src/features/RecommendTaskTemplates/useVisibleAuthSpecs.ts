@@ -25,7 +25,9 @@ export const useVisibleAuthSpecs = (
   );
 
   return useMemo(() => {
-    return template.connectors.filter((spec) => {
+    // Defensive: older backends (pre-v2.2.7) returned templates without a
+    // `connectors` field. Guard against undefined to avoid crashing.
+    return (template.connectors ?? []).filter((spec) => {
       if (isConnectorConnected(spec)) return false;
       if (
         mainIconProvider &&

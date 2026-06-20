@@ -22,10 +22,15 @@ const SELF_ICON_MAP: Record<TaskTemplateIcon, TemplateIconComponent> = {
 const toSpec = (icon: string | TemplateIconComponent): TemplateIconSpec =>
   typeof icon === 'string' ? { kind: 'url', src: icon } : { Comp: icon, kind: 'component' };
 
-const getPrioritizedConnectors = (template: TaskTemplate): TaskTemplateConnectorReference[] => [
-  ...template.connectors.filter((connector) => connector.required),
-  ...template.connectors.filter((connector) => !connector.required),
-];
+const getPrioritizedConnectors = (template: TaskTemplate): TaskTemplateConnectorReference[] => {
+  // Defensive: older backends (pre-v2.2.7) returned templates without a
+  // `connectors` field. Guard against undefined to avoid crashing the card.
+  const connectors = template.connectors ?? [];
+  return [
+    ...connectors.filter((connector) => connector.required),
+    ...connectors.filter((connector) => !connector.required),
+  ];
+};
 
 /**
  * Resolve the icon to display on a task-template card.

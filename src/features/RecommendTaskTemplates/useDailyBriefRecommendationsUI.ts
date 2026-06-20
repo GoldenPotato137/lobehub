@@ -209,7 +209,12 @@ export function useDailyBriefRecommendationsUI(
   const requiredSources = useMemo(() => {
     const sources = new Set<TaskTemplateConnectorSource>();
     for (const tmpl of templates) {
-      for (const connector of tmpl.connectors) sources.add(connector.source);
+      // Defensive: older backends (pre-v2.2.7) returned templates without a
+      // `connectors` field (they used `requiresSkills`/`optionalSkills`). If a
+      // stale SWR cache entry from such a backend is rehydrated after an
+      // upgrade, `tmpl.connectors` is undefined and this loop would crash with
+      // "is not iterable". Guard with `?? []` so the UI degrades gracefully.
+      for (const connector of tmpl.connectors ?? []) sources.add(connector.source);
     }
     return sources;
   }, [templates]);
