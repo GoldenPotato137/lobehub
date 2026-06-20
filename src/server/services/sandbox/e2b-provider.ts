@@ -46,63 +46,115 @@ export class E2BSandboxProvider {
     try {
       const sandbox = await this.getSandbox();
 
-      switch (normalizedToolName) {
-        case 'editFile': {
-          return this.success(await this.editFile(sandbox, params));
-        }
-        case 'executeCode': {
-          return this.success(await this.executeCode(sandbox, params));
-        }
-        case 'getCommandOutput': {
-          return this.success(this.getCommandOutput(params));
-        }
-        case 'globFiles': {
-          return this.success(await this.globFiles(sandbox, params));
-        }
-        case 'grepContent': {
-          return this.success(await this.grepContent(sandbox, params));
-        }
-        case 'killCommand': {
-          return this.success(await this.killCommand(params));
-        }
-        case 'listFiles': {
-          return this.success(await this.listFiles(sandbox, params));
-        }
-        case 'moveFiles': {
-          return this.success(await this.moveFiles(sandbox, params));
-        }
-        case 'readFile': {
-          return this.success(await this.readFile(sandbox, params));
-        }
-        case 'runCommand': {
-          return this.success(await this.runCommand(sandbox, params));
-        }
-        case 'searchFiles': {
-          return this.success(await this.searchFiles(sandbox, params));
-        }
-        case 'writeFile': {
-          return this.success(await this.writeFile(sandbox, params));
-        }
-        case 'exportFile': {
-          return this.success(await this.exportFile(sandbox, params));
-        }
-        default: {
-          return this.failure(`Unsupported E2B sandbox tool: ${toolName}`);
+      return this.success(await this.dispatchTool(sandbox, normalizedToolName, toolName, params));
+    } catch (error) {
+      if (this.isStaleSandboxError(error)) {
+        try {
+          await this.sessionManager.resetSession(this.topicId);
+          const sandbox = await this.getSandbox();
+          return {
+            ...this.success(await this.dispatchTool(sandbox, normalizedToolName, toolName, params)),
+            sessionExpiredAndRecreated: true,
+          };
+        } catch (retryError) {
+          log('E2B sandbox tool %s failed after stale-session retry: %O', toolName, retryError);
+          return this.failure(retryError);
         }
       }
-    } catch (error) {
+
       log('E2B sandbox tool %s failed: %O', toolName, error);
       return this.failure(error);
     }
   }
 
   async readFileBytes(path: string): Promise<Uint8Array> {
-    const sandbox = await this.getSandbox();
-    return sandbox.files.read(path, { format: 'bytes' });
+    try {
+      const sandbox = await this.getSandbox();
+      return await sandbox.files.read(path, { format: 'bytes' });
+    } catch (error) {
+      if (!this.isStaleSandboxError(error)) throw error;
+
+      await this.sessionManager.resetSession(this.topicId);
+      const sandbox = await this.getSandbox();
+      return sandbox.files.read(path, { format: 'bytes' });
+    }
   }
 
   async writeFileBytes(path: string, bytes: Uint8Array): Promise<void> {
-    const sandbox = await this.getSandbox();
+    try {
+      const sandbox = await this.getSandbox();
+      await this.writeFileBytesToSandbox(sandbox, path, bytes);
+    } catch (error) {
+      if (!this.isStaleSandboxError(error)) throw error;
+
+      await this.sessionManager.resetSession(this.topicId);
+      const sandbox = await this.getSandbox();
+      await this.writeFileBytesToSandbox(sandbox, path, bytes);
+    }
+  }
+
+  private async getSandbox() {
+    return this.sessionManager.getSandbox(this.topicId, this.userId);
+  }
+
+  private async dispatchTool(
+    sandbox: Sandbox,
+    normalizedToolName: string,
+    originalToolName: string,
+    params: Record<string, any>,
+  ) {
+    switch (normalizedToolName) {
+      case 'editFile': {
+        return this.editFile(sandbox, params);
+      }
+      case 'executeCode': {
+        return this.executeCode(sandbox, params);
+      }
+      case 'getCommandOutput': {
+        return this.getCommandOutput(params);
+      }
+      case 'globFiles': {
+        return this.globFiles(sandbox, params);
+      }
+      case 'grepContent': {
+        return this.grepContent(sandbox, params);
+      }
+      case 'killCommand': {
+        return this.killCommand(params);
+      }
+      case 'listFiles': {
+        return this.listFiles(sandbox, params);
+      }
+      case 'moveFiles': {
+        return this.moveFiles(sandbox, params);
+      }
+      case 'readFile': {
+        return this.readFile(sandbox, params);
+      }
+      case 'runCommand': {
+        return this.runCommand(sandbox, params);
+      }
+      case 'searchFiles': {
+        return this.searchFiles(sandbox, params);
+      }
+      case 'writeFile': {
+        return this.writeFile(sandbox, params);
+      }
+      case 'exportFile': {
+        return this.exportFile(sandbox, params);
+      }
+      default: {
+        throw new Error(`Unsupported E2B sandbox tool: ${originalToolName}`);
+      }
+    }
+  }
+
+  private isStaleSandboxError(error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return /sandbox .* not found/i.test(message) || /\[unimplemented\].*HTTP 404/i.test(message);
+  }
+
+  private async writeFileBytesToSandbox(sandbox: Sandbox, path: string, bytes: Uint8Array) {
     const parentDir = dirname(path);
     if (parentDir && parentDir !== '.' && parentDir !== '/') {
       await sandbox.files.makeDir(parentDir).catch(() => undefined);
@@ -111,10 +163,6 @@ export class E2BSandboxProvider {
     // always returns a new Uint8Array backed by a fresh ArrayBuffer (not SharedArrayBuffer).
     const buf = bytes.slice().buffer as ArrayBuffer;
     await sandbox.files.write(path, buf);
-  }
-
-  private async getSandbox() {
-    return this.sessionManager.getSandbox(this.topicId, this.userId);
   }
 
   private async executeCode(sandbox: Sandbox, params: Record<string, any>) {

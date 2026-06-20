@@ -234,6 +234,13 @@ export class E2BSandboxSessionManager {
     session?.commandHandles.set(commandId, handle);
   }
 
+  async resetSession(topicId: string) {
+    const session = sessions.get(topicId);
+    sessions.delete(topicId);
+
+    await session?.sandbox.kill().catch(() => undefined);
+  }
+
   deleteCommandHandle(topicId: string, commandId: string) {
     sessions.get(topicId)?.commandHandles.delete(commandId);
   }

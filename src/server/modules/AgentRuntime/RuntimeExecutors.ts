@@ -84,6 +84,7 @@ import {
 import { FileService } from '@/server/services/file';
 import { MessageService } from '@/server/services/message';
 import { OnboardingService } from '@/server/services/onboarding';
+import { isE2BSandboxProviderEnabled } from '@/server/services/sandbox/e2b-session-manager';
 import {
   type ToolExecutionResultResponse,
   type ToolExecutionService,
@@ -707,8 +708,22 @@ export const createRuntimeExecutors = (
 
         // Import attached files into the sandbox filesystem (async, non-blocking).
         // Only runs on the first step to avoid redundant writes on subsequent agentic steps.
+        // Uses isE2BSandboxProviderEnabled() instead of enabledToolIds check because the
+        // sandbox tool may not be in the agent's enabledToolIds (depends on runtimeMode
+        // config), but files should still be injected whenever the server has sandbox infra.
+        const sandboxProviderActive = isE2BSandboxProviderEnabled();
+        log(
+          `[sandbox-file-inject][%s] check: sandboxProviderActive=%s, sandboxEnabled=%s, stepCount=%d, hasServerDB=%s, userId=%s, topicId=%s`,
+          operationLogId,
+          sandboxProviderActive,
+          sandboxEnabled,
+          state.stepCount,
+          !!ctx.serverDB,
+          ctx.userId,
+          ctx.topicId,
+        );
         if (
-          sandboxEnabled === 'true' &&
+          sandboxProviderActive &&
           state.stepCount === 0 &&
           ctx.serverDB &&
           ctx.userId &&
@@ -722,6 +737,14 @@ export const createRuntimeExecutors = (
                 m?.role === 'user' &&
                 (m.imageList?.length || m.fileList?.length || m.videoList?.length),
             );
+          log(
+            `[sandbox-file-inject][%s] lastUserMsg found=%s, imageList=%d, fileList=%d, videoList=%d`,
+            operationLogId,
+            !!lastUserMsg,
+            lastUserMsg?.imageList?.length ?? 0,
+            lastUserMsg?.fileList?.length ?? 0,
+            lastUserMsg?.videoList?.length ?? 0,
+          );
 
           if (lastUserMsg) {
             const fileIds: string[] = [];
@@ -761,9 +784,16 @@ export const createRuntimeExecutors = (
                   });
 
                   await sandboxService.importFiles(filesToImport);
-                  log(`[${operationLogId}] imported %d file(s) into sandbox`, filesToImport.length);
+                  log(
+                    `[sandbox-file-inject][%s] imported %d file(s) into sandbox`,
+                    operationLogId,
+                    filesToImport.length,
+                  );
                 } catch (error) {
-                  log(`[${operationLogId}] sandbox file import failed (non-fatal): %O`, error);
+                  console.error(
+                    `[sandbox-file-inject][${operationLogId}] sandbox file import failed (non-fatal):`,
+                    error,
+                  );
                 }
               })();
             }
