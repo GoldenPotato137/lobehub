@@ -52,4 +52,25 @@ describe('sandbox service factory', () => {
     expect(service.kind).toBe('onlyboxes');
     expect(service.capabilities.languages).toEqual(['python', 'javascript', 'typescript']);
   });
+
+  it('uses the agent-sandbox (e2b) provider when configured', async () => {
+    vi.doMock('@/envs/sandbox', () => ({
+      sandboxEnv: {
+        SANDBOX_PROVIDER: 'agent-sandbox',
+      },
+    }));
+
+    const { createSandboxService } = await import('../factory');
+    const service = createSandboxService(baseOptions);
+
+    expect(service.kind).toBe('agent-sandbox');
+    expect(service.capabilities).toMatchObject({
+      backgroundCommands: true,
+      exportFile: true,
+      files: true,
+      persistentSession: true,
+      shell: true,
+      skillScripts: true,
+    });
+  });
 });
