@@ -24,7 +24,7 @@ export const getSandboxConfig = () => {
       ONLYBOXES_LEASE_TTL_SEC: z.preprocess(emptyStringToUndefined, z.coerce.number().optional()),
       SANDBOX_PROVIDER: z.preprocess(
         emptyStringToUndefined,
-        z.enum(['market', 'onlyboxes']).optional(),
+        z.enum(['market', 'onlyboxes', 'agent-sandbox']).optional(),
       ),
     },
   });

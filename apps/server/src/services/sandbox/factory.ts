@@ -1,5 +1,6 @@
 import { sandboxEnv } from '@/envs/sandbox';
 
+import { E2BSandboxProvider } from './providers/e2b';
 import { MarketSandboxProvider } from './providers/market';
 import { OnlyboxesSandboxProvider } from './providers/onlyboxes';
 import { SandboxMiddlewareService } from './service';
@@ -18,6 +19,10 @@ const createSandboxProvider = (options: SandboxServiceOptions): SandboxProvider 
   switch (getSandboxProviderKind()) {
     case 'onlyboxes': {
       return new OnlyboxesSandboxProvider(options);
+    }
+
+    case 'agent-sandbox': {
+      return new E2BSandboxProvider(options);
     }
 
     case 'market': {
