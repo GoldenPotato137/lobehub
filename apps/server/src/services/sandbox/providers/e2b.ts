@@ -111,19 +111,15 @@ export class E2BSandboxProvider implements SandboxProvider {
 
   async exportFileToUploadUrl({
     path,
+    uploadHeaders,
+    uploadUrl,
   }: SandboxProviderFileExportRequest): Promise<SandboxProviderFileExportResult> {
     try {
-      const sandbox = await this.getSandbox();
-      const bytes = await sandbox.files.read(path, { format: 'bytes' });
+      const bytes = await this.readSandboxFileBytes(path);
+      await this.uploadBytesToSignedUrl(uploadUrl, bytes, uploadHeaders);
 
       return {
-        result: {
-          content: Buffer.from(bytes).toString('base64'),
-          encoding: 'base64',
-          path,
-          size: bytes.byteLength,
-          success: true,
-        },
+        size: bytes.byteLength,
         success: true,
       };
     } catch (error) {
@@ -136,17 +132,11 @@ export class E2BSandboxProvider implements SandboxProvider {
 
       try {
         await this.sessionManager.resetSession(this.topicId);
-        const sandbox = await this.getSandbox();
-        const bytes = await sandbox.files.read(path, { format: 'bytes' });
+        const bytes = await this.readSandboxFileBytes(path);
+        await this.uploadBytesToSignedUrl(uploadUrl, bytes, uploadHeaders);
 
         return {
-          result: {
-            content: Buffer.from(bytes).toString('base64'),
-            encoding: 'base64',
-            path,
-            size: bytes.byteLength,
-            success: true,
-          },
+          size: bytes.byteLength,
           success: true,
         };
       } catch (retryError) {
@@ -155,6 +145,34 @@ export class E2BSandboxProvider implements SandboxProvider {
           success: false,
         };
       }
+    }
+  }
+
+  private async readSandboxFileBytes(path: string): Promise<Uint8Array> {
+    const sandbox = await this.getSandbox();
+    return sandbox.files.read(path, { format: 'bytes' });
+  }
+
+  private async uploadBytesToSignedUrl(
+    uploadUrl: string,
+    bytes: Uint8Array,
+    uploadHeaders?: Record<string, string>,
+  ): Promise<void> {
+    // e2b sandboxes don't have a backend-side "export to S3" capability, so the
+    // LobeHub server reads the file bytes from the sandbox and PUTs them to the
+    // pre-signed S3 URL itself. Do NOT set Content-Type here: the signed URL was
+    // created without it, so adding it would break the signature.
+    const response = await fetch(uploadUrl, {
+      body: Buffer.from(bytes),
+      headers: uploadHeaders,
+      method: 'PUT',
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      throw new Error(
+        `Sandbox file export upload failed: HTTP ${response.status} ${response.statusText}${text ? ` - ${text}` : ''}`,
+      );
     }
   }
 
