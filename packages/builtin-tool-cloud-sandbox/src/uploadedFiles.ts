@@ -1,8 +1,19 @@
 /**
  * Directory inside the cloud sandbox where user-uploaded files (attached to the
  * conversation topic / session) are synced when the sandbox session starts.
+ *
+ * Configurable via the `SANDBOX_UPLOADED_FILES_DIR` env var so deployments using
+ * sandbox templates where `/mnt/data` is not pre-created or not writable by the
+ * sandbox user (e.g. agent-sandbox's code-interpreter template runs as `user`
+ * and `/mnt` is `root:root 0755`) can point to a writable location such as
+ * `/home/user/data`. The `NEXT_PUBLIC_` prefixed variant is read so the same
+ * value is inlined into the client bundle (system prompt rendering) and the
+ * server bundle (bootstrap command).
  */
-export const SANDBOX_UPLOADED_FILES_DIR = '/mnt/data';
+export const SANDBOX_UPLOADED_FILES_DIR =
+  process.env.NEXT_PUBLIC_SANDBOX_UPLOADED_FILES_DIR ||
+  process.env.SANDBOX_UPLOADED_FILES_DIR ||
+  '/mnt/data';
 
 /** Skip individual files larger than this when syncing into the sandbox. */
 export const SANDBOX_INIT_MAX_FILE_SIZE = 100 * 1024 * 1024;
