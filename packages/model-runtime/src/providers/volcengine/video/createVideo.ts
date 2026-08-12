@@ -5,6 +5,33 @@ import type { CreateVideoPayload, CreateVideoResponse } from '../../../types/vid
 
 const log = createDebug('lobe-video:volcengine');
 
+const IMAGE_INLINE_FETCH_TIMEOUT_MS = 60_000;
+
+const inlineImageUrlAsBase64 = async (url: string): Promise<string> => {
+  if (!/^https?:\/\//.test(url)) return url;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), IMAGE_INLINE_FETCH_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+
+    if (!response.ok) throw new Error(`fetch image failed with status ${response.status}`);
+
+    const contentType = response.headers.get('content-type')?.split(';')[0]?.trim() || 'image/jpeg';
+    const bytes = Buffer.from(await response.arrayBuffer());
+
+    log('Inlined image as base64: %s (%d bytes, %s)', url, bytes.byteLength, contentType);
+
+    return `data:${contentType};base64,${bytes.toString('base64')}`;
+  } catch (error) {
+    log('Failed to inline image %s, falling back to URL: %O', url, error);
+    return url;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
 /**
  * Volcengine video generation implementation
  * API docs: https://www.volcengine.com/docs/232791/1399051
@@ -33,25 +60,41 @@ export async function createVolcengineVideo(
 
   const baseURL = options.baseURL || 'https://ark.cn-beijing.volces.com/api/v3';
 
+  const [inlinedImageUrl, inlinedImageUrls, inlinedEndImageUrl] = await Promise.all([
+    imageUrl ? inlineImageUrlAsBase64(imageUrl) : Promise.resolve(imageUrl),
+    imageUrls
+      ? Promise.all(imageUrls.map((url) => inlineImageUrlAsBase64(url)))
+      : Promise.resolve(imageUrls),
+    endImageUrl ? inlineImageUrlAsBase64(endImageUrl) : Promise.resolve(endImageUrl),
+  ]);
+
   // Build content array
   const content: Record<string, unknown>[] = [{ text: prompt, type: 'text' }];
 
-  if (imageUrl) {
-    content.push({ image_url: { url: imageUrl }, role: 'first_frame', type: 'image_url' });
+  if (inlinedImageUrl) {
+    content.push({ image_url: { url: inlinedImageUrl }, role: 'first_frame', type: 'image_url' });
   }
 
-  if (imageUrls && imageUrls.length > 0) {
-    if (imageUrls.length === 1 && endImageUrl) {
-      content.push({ image_url: { url: imageUrls[0] }, role: 'first_frame', type: 'image_url' });
+  if (inlinedImageUrls && inlinedImageUrls.length > 0) {
+    if (inlinedImageUrls.length === 1 && inlinedEndImageUrl) {
+      content.push({
+        image_url: { url: inlinedImageUrls[0] },
+        role: 'first_frame',
+        type: 'image_url',
+      });
     } else {
-      imageUrls.forEach((url) =>
+      inlinedImageUrls.forEach((url) =>
         content.push({ image_url: { url }, role: 'reference_image', type: 'image_url' }),
       );
     }
   }
 
-  if (endImageUrl) {
-    content.push({ image_url: { url: endImageUrl }, role: 'last_frame', type: 'image_url' });
+  if (inlinedEndImageUrl) {
+    content.push({
+      image_url: { url: inlinedEndImageUrl },
+      role: 'last_frame',
+      type: 'image_url',
+    });
   }
 
   // Build request body

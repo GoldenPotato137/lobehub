@@ -11,6 +11,14 @@ vi.mock('debug', () => ({
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
+const getApiCallBody = () => {
+  const apiCall = mockFetch.mock.calls.find((call) =>
+    (call[0] as string).includes('contents/generations/tasks'),
+  );
+
+  return JSON.parse(apiCall![1].body as string);
+};
+
 describe('createVolcengineVideo', () => {
   let payload: CreateVideoPayload;
   let options: CreateVideoOptions;
@@ -86,7 +94,7 @@ describe('createVolcengineVideo', () => {
 
       await createVolcengineVideo(payload, options);
 
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const body = getApiCallBody();
       expect(body.content).toHaveLength(2);
       expect(body.content[1]).toEqual({
         image_url: { url: 'https://example.com/start.jpg' },
@@ -105,7 +113,7 @@ describe('createVolcengineVideo', () => {
 
       await createVolcengineVideo(payload, options);
 
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const body = getApiCallBody();
       expect(body.content).toHaveLength(2);
       expect(body.content[1]).toEqual({
         image_url: { url: 'https://example.com/end.jpg' },
@@ -125,7 +133,7 @@ describe('createVolcengineVideo', () => {
 
       await createVolcengineVideo(payload, options);
 
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      const body = getApiCallBody();
       expect(body.content).toHaveLength(3);
       expect(body.content[0].type).toBe('text');
       expect(body.content[1].role).toBe('first_frame');
@@ -257,6 +265,104 @@ describe('createVolcengineVideo', () => {
       const fetchHeaders = mockFetch.mock.calls[0][1].headers;
       expect(fetchHeaders['Authorization']).toBe('Bearer test-api-key');
       expect(fetchHeaders['Content-Type']).toBe('application/json');
+    });
+  });
+
+  describe('image inlining', () => {
+    const imageBytes = new Uint8Array([137, 80, 78, 71]);
+
+    const mockImageAndApiFetch = () => {
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes('contents/generations/tasks')) {
+          return Promise.resolve({
+            json: () => Promise.resolve({ id: 'task-1' }),
+            ok: true,
+          });
+        }
+
+        return Promise.resolve({
+          arrayBuffer: () =>
+            Promise.resolve(
+              imageBytes.buffer.slice(
+                imageBytes.byteOffset,
+                imageBytes.byteOffset + imageBytes.byteLength,
+              ),
+            ),
+          headers: new Headers({ 'content-type': 'image/png' }),
+          ok: true,
+        });
+      });
+    };
+
+    it('should inline http imageUrl as base64 data URI', async () => {
+      mockImageAndApiFetch();
+
+      payload.params.imageUrl = 'https://example.com/start.png';
+
+      await createVolcengineVideo(payload, options);
+
+      const body = getApiCallBody();
+
+      expect(body.content[1]).toEqual({
+        image_url: {
+          url: `data:image/png;base64,${Buffer.from(imageBytes).toString('base64')}`,
+        },
+        role: 'first_frame',
+        type: 'image_url',
+      });
+    });
+
+    it('should leave data URI untouched without fetching', async () => {
+      mockFetch.mockResolvedValue({
+        json: () => Promise.resolve({ id: 'task-1' }),
+        ok: true,
+      });
+
+      const dataUri = 'data:image/png;base64,aGVsbG8=';
+      payload.params.imageUrl = dataUri;
+
+      await createVolcengineVideo(payload, options);
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.content[1].image_url.url).toBe(dataUri);
+    });
+
+    it('should fall back to original URL when image fetch fails', async () => {
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes('contents/generations/tasks')) {
+          return Promise.resolve({
+            json: () => Promise.resolve({ id: 'task-1' }),
+            ok: true,
+          });
+        }
+
+        return Promise.resolve({ ok: false, status: 404 });
+      });
+
+      payload.params.imageUrl = 'https://example.com/missing.png';
+
+      await createVolcengineVideo(payload, options);
+
+      const body = getApiCallBody();
+
+      expect(body.content[1].image_url.url).toBe('https://example.com/missing.png');
+    });
+
+    it('should inline both first and last frame images', async () => {
+      mockImageAndApiFetch();
+
+      payload.params.imageUrl = 'https://example.com/start.png';
+      payload.params.endImageUrl = 'https://example.com/end.png';
+
+      await createVolcengineVideo(payload, options);
+
+      const body = getApiCallBody();
+
+      expect(body.content).toHaveLength(3);
+      expect(body.content[1].image_url.url).toMatch(/^data:image\/png;base64,/);
+      expect(body.content[2].image_url.url).toMatch(/^data:image\/png;base64,/);
+      expect(body.content[2].role).toBe('last_frame');
     });
   });
 
